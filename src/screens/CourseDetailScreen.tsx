@@ -399,12 +399,16 @@ const WeeklyProgressChart = ({ actions, startDate, durationWeeks }: {
       
       const injections = weekActions.filter(a => a.type === 'injection').length;
       const tablets = weekActions.filter(a => a.type === 'tablet').length;
+      const labs = weekActions.filter(a => a.type === 'lab').length;
+      const notes = weekActions.filter(a => a.type === 'note').length;
       
       weeks.push({
         week: i + 1,
         injections,
         tablets,
-        total: injections + tablets
+        labs,
+        notes,
+        total: injections + tablets + labs + notes
       });
     }
     
@@ -412,17 +416,43 @@ const WeeklyProgressChart = ({ actions, startDate, durationWeeks }: {
   };
 
   const weeklyData = getWeeklyData();
-  const chartData = weeklyData.map(week => ({
-    value: week.total,
-    label: `Н${week.week}`,
-    frontColor: colors.accent,
-  }));
+  const maxValue = Math.max(...weeklyData.map(w => w.total)) || 10;
 
   return (
     <View style={styles.chartContainer}>
       <Text style={styles.chartTitle}>Активность по неделям</Text>
+      
+      {/* Статистика по неделям */}
+      <View style={styles.weeklyStats}>
+        {weeklyData.slice(-4).map((week, index) => (
+          <View key={week.week} style={styles.weeklyStatItem}>
+            <Text style={styles.weeklyStatWeek}>Н{week.week}</Text>
+            <View style={styles.weeklyStatBars}>
+              <View style={[styles.weeklyStatBar, { 
+                height: (week.injections / maxValue) * 20, 
+                backgroundColor: colors.accent 
+              }]} />
+              <View style={[styles.weeklyStatBar, { 
+                height: (week.tablets / maxValue) * 20, 
+                backgroundColor: colors.blue 
+              }]} />
+              <View style={[styles.weeklyStatBar, { 
+                height: (week.labs / maxValue) * 20, 
+                backgroundColor: colors.success 
+              }]} />
+            </View>
+            <Text style={styles.weeklyStatTotal}>{week.total}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Основной график */}
       <BarChart
-        data={chartData}
+        data={weeklyData.map(week => ({
+          value: week.total,
+          label: `Н${week.week}`,
+          frontColor: colors.accent,
+        }))}
         width={width - 64}
         height={200}
         barWidth={22}
@@ -435,8 +465,169 @@ const WeeklyProgressChart = ({ actions, startDate, durationWeeks }: {
         yAxisTextStyle={{ color: colors.gray }}
         xAxisLabelTextStyle={{ color: colors.gray }}
         noOfSections={3}
-        maxValue={Math.max(...chartData.map(d => d.value)) || 10}
+        maxValue={maxValue}
       />
+    </View>
+  );
+};
+
+// Компонент Compliance Chart
+const ComplianceChart = ({ actions, startDate, durationWeeks }: { 
+  actions: any[]; 
+  startDate: string; 
+  durationWeeks: number;
+}) => {
+  const getComplianceData = () => {
+    const weeks = [];
+    const start = new Date(startDate);
+    
+    for (let i = 0; i < durationWeeks; i++) {
+      const weekStart = new Date(start);
+      weekStart.setDate(start.getDate() + i * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      
+      const weekActions = actions.filter(action => {
+        const actionDate = new Date(action.timestamp);
+        return actionDate >= weekStart && actionDate <= weekEnd;
+      });
+      
+      // Предполагаем, что в неделю должно быть 7 инъекций и 14 приёмов таблеток
+      const expectedInjections = 7;
+      const expectedTablets = 14;
+      
+      const actualInjections = weekActions.filter(a => a.type === 'injection').length;
+      const actualTablets = weekActions.filter(a => a.type === 'tablet').length;
+      
+      const injectionCompliance = Math.min(100, (actualInjections / expectedInjections) * 100);
+      const tabletCompliance = Math.min(100, (actualTablets / expectedTablets) * 100);
+      const overallCompliance = (injectionCompliance + tabletCompliance) / 2;
+      
+      weeks.push({
+        week: i + 1,
+        injectionCompliance,
+        tabletCompliance,
+        overallCompliance
+      });
+    }
+    
+    return weeks;
+  };
+
+  const complianceData = getComplianceData();
+
+  return (
+    <View style={styles.chartContainer}>
+      <Text style={styles.chartTitle}>Соблюдение графика</Text>
+      
+      <LineChart
+        data={complianceData.map(week => ({
+          value: week.overallCompliance,
+          label: `Н${week.week}`,
+          index: week.week - 1
+        }))}
+        width={width - 64}
+        height={200}
+        color={colors.success}
+        thickness={3}
+        curved
+        dataPointsColor={colors.success}
+        dataPointsRadius={5}
+        hideAxesAndRules={false}
+        xAxisThickness={1}
+        yAxisThickness={1}
+        xAxisColor={colors.grayLight}
+        yAxisColor={colors.grayLight}
+        xAxisLabelTextStyle={{ color: colors.gray, fontSize: 10 }}
+        yAxisTextStyle={{ color: colors.gray, fontSize: 10 }}
+        rulesColor={colors.grayLight}
+        rulesType="dashed"
+        showVerticalLines
+        verticalLinesColor={colors.grayLight}
+        noOfSections={4}
+        maxValue={100}
+      />
+    </View>
+  );
+};
+
+// Компонент Health Trends
+const HealthTrends = ({ labs }: { labs: any[] }) => {
+  const getHealthTrends = () => {
+    const trends = {
+      testosterone: [],
+      estradiol: [],
+      prolactin: [],
+      liver: []
+    };
+
+    labs.forEach(lab => {
+      const date = new Date(lab.date);
+      const value = lab.value;
+      
+      switch (lab.name) {
+        case 'Тестостерон общий':
+          trends.testosterone.push({ date, value });
+          break;
+        case 'Эстрадиол':
+          trends.estradiol.push({ date, value });
+          break;
+        case 'Пролактин':
+          trends.prolactin.push({ date, value });
+          break;
+        case 'АЛТ':
+        case 'АСТ':
+          trends.liver.push({ date, value, name: lab.name });
+          break;
+      }
+    });
+
+    return trends;
+  };
+
+  const trends = getHealthTrends();
+
+  return (
+    <View style={styles.chartContainer}>
+      <Text style={styles.chartTitle}>Показатели здоровья</Text>
+      
+      {trends.testosterone.length > 0 && (
+        <View style={styles.trendSection}>
+          <Text style={styles.trendLabel}>Тестостерон</Text>
+          <LineChart
+            data={trends.testosterone.map((point, index) => ({
+              value: point.value,
+              index
+            }))}
+            width={width - 64}
+            height={120}
+            color={colors.accent}
+            thickness={2}
+            curved
+            hideAxesAndRules
+            hideYAxisText
+          />
+        </View>
+      )}
+      
+      {trends.liver.length > 0 && (
+        <View style={styles.trendSection}>
+          <Text style={styles.trendLabel}>Печень (АЛТ/АСТ)</Text>
+          <LineChart
+            data={trends.liver.map((point, index) => ({
+              value: point.value,
+              index
+            }))}
+            width={width - 64}
+            height={120}
+            color={colors.warning}
+            thickness={2}
+            curved
+            hideAxesAndRules
+            hideYAxisText
+          />
+        </View>
+      )}
     </View>
   );
 };
@@ -977,7 +1168,48 @@ const styles = StyleSheet.create({
   },
   analyticsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
+  },
+  weeklyStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.grayLight + '20',
+    borderRadius: 12,
+  },
+  weeklyStatItem: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  weeklyStatWeek: {
+    fontSize: 12,
+    color: colors.gray,
+    fontWeight: '600',
+  },
+  weeklyStatBars: {
+    flexDirection: 'row',
+    gap: 2,
+    alignItems: 'flex-end',
+  },
+  weeklyStatBar: {
+    width: 8,
+    borderRadius: 2,
+  },
+  weeklyStatTotal: {
+    fontSize: 14,
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  trendSection: {
+    marginBottom: 16,
+  },
+  trendLabel: {
+    fontSize: 14,
+    color: colors.gray,
+    marginBottom: 8,
+    fontWeight: '600',
   },
   miniChart: {
     overflow: 'hidden',
@@ -1432,6 +1664,18 @@ const CourseDetailScreen = () => {
         return (
           <View style={styles.tabContentContainer}>
             <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
+              <ComplianceChart 
+                actions={actions} 
+                startDate={course.startDate} 
+                durationWeeks={course.durationWeeks} 
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeIn.delay(200)} style={styles.section}>
+              <HealthTrends labs={labs} />
+            </Animated.View>
+
+            <Animated.View entering={FadeIn.delay(300)} style={styles.section}>
               <Text style={styles.sectionTitle}>Детальная аналитика</Text>
               <View style={styles.analyticsGrid}>
                 <MetricCard
@@ -1449,6 +1693,22 @@ const CourseDetailScreen = () => {
                   color={colors.accent}
                   trend="stable"
                   subtitle="Общая оценка"
+                />
+                <MetricCard
+                  icon="heartbeat"
+                  label="Здоровье"
+                  value="85%"
+                  color={colors.warning}
+                  trend="up"
+                  subtitle="По анализам"
+                />
+                <MetricCard
+                  icon="trophy"
+                  label="Достижения"
+                  value="3/5"
+                  color={colors.orange}
+                  trend="up"
+                  subtitle="Получено"
                 />
               </View>
             </Animated.View>
