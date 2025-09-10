@@ -350,3 +350,12 @@ export class AuthService {
     };
   }
 }
+
+// Legacy-compatible helpers for screens still importing functions
+export async function getUser(): Promise<{ data: { user: { id: string } | null } }> {
+  return AuthService.getUser();
+}
+
+export async function signOut(): Promise<void> {
+  return AuthService.signOut();
+}

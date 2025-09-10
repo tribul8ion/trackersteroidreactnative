@@ -2294,7 +2294,7 @@ export default function Dashboard() {
                   const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
                   hasPlanned = compounds.some((comp: any) => {
                     const sched = schedule[comp.key];
-                    return comp.form === 'Инъекция' && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
+                    return (comp.form && (comp.form.includes('Инъек') || comp.form === 'Injection')) && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
                   });
                 } catch {}
                 if (hasPlanned) {
@@ -2333,7 +2333,7 @@ export default function Dashboard() {
                   const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
                   hasPlanned = compounds.some((comp: any) => {
                     const sched = schedule[comp.key];
-                    return comp.form && comp.form.includes('Таблет') && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
+                    return comp.form && (comp.form.includes('Таблет') || comp.form === 'Tablet') && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
                   });
                 } catch {}
                 if (hasPlanned) {

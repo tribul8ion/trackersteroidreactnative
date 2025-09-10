@@ -369,3 +369,52 @@ export class CoursesService {
     ];
   }
 }
+
+// Backward-compatible named exports for legacy screens
+export async function getCourses(user_id?: string): Promise<{ data: Course[]; error?: any }> {
+  try {
+    const data = await CoursesService.getCourses();
+    return { data };
+  } catch (error) {
+    return { data: [], error };
+  }
+}
+
+export async function getCourseById(id: string): Promise<{ data: Course | null; error?: any }> {
+  try {
+    const data = await CoursesService.getCourseById(id);
+    return { data };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
+export async function addCourse(course: any): Promise<{ error?: any }> {
+  try {
+    const { success, error } = await CoursesService.createCourse(course);
+    if (!success) return { error: error || new Error('Failed to create course') };
+    return {};
+  } catch (error) {
+    return { error };
+  }
+}
+
+export async function updateCourse(id: string, updates: Partial<Course>): Promise<{ error?: any }> {
+  try {
+    const { success, error } = await CoursesService.updateCourse(id, updates);
+    if (!success) return { error: error || new Error('Failed to update course') };
+    return {};
+  } catch (error) {
+    return { error };
+  }
+}
+
+export async function deleteCourse(id: string): Promise<{ error?: any }> {
+  try {
+    const { success, error } = await CoursesService.deleteCourse(id);
+    if (!success) return { error: error || new Error('Failed to delete course') };
+    return {};
+  } catch (error) {
+    return { error };
+  }
+}
