@@ -135,6 +135,12 @@ export class AuthService {
     return this.currentUser;
   }
 
+  // Helper used by screens expecting a Supabase-like shape
+  static async getUser(): Promise<{ data: { user: { id: string } | null } }> {
+    const user = this.getCurrentUser();
+    return { data: { user: user ? { id: user.id } : null } };
+  }
+
   // Проверка авторизации
   static isAuthenticated(): boolean {
     return this.currentUser !== null;

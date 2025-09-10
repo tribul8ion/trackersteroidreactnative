@@ -19,8 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { getUser } from '../services/auth';
-import { restoreSession } from '../services/session';
+import { AuthService } from '../services/auth';
 import { colors } from '../theme/colors';
 import { FontAwesome5 } from '@expo/vector-icons';
 
@@ -59,8 +58,7 @@ const SplashScreen = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       setLoadingStep(2);
-      await restoreSession();
-      const { data } = await getUser();
+      const { data } = await AuthService.getUser();
       
       setLoadingStep(3);
       await new Promise(resolve => setTimeout(resolve, 500));

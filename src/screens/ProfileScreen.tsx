@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getUser } from '../services/auth';
-import { getProfile, Profile } from '../services/profile';
-import { getCourses } from '../services/courses';
-import { getActions } from '../services/actions';
-import { getAchievements } from '../services/achievements';
+import { AuthService } from '../services/auth';
+import type { Profile } from '../services/types';
+import { CoursesService } from '../services/courses';
+import { ActionsService } from '../services/actions';
+import { AchievementsService } from '../services/achievements';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
@@ -166,25 +166,18 @@ const ProfileScreen = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data: userData } = await getUser();
-      const user_id = userData?.user?.id;
-      if (!user_id) throw new Error('Не удалось получить пользователя');
-      // Профиль
-      const { data: profileData, error: profileError } = await getProfile(user_id);
-      if (profileError) throw profileError;
-      setProfile(profileData);
-      // Курсы
-      const { data: coursesData } = await getCourses(user_id);
-      // Инъекции
-      const { data: actionsData } = await getActions(user_id);
-      // Достижения
-      const { data: achievementsData } = await getAchievements(user_id);
+      const user = AuthService.getCurrentUser();
+      if (!user) throw new Error('Пользователь не авторизован');
+      setProfile(user);
+      const coursesData = await CoursesService.getCourses();
+      const actionsData = await ActionsService.getActions();
+      const achievementsWithProgress = await AchievementsService.getAchievementsWithProgress();
       setStats({
         courses: coursesData ? coursesData.length : 0,
         injections: actionsData ? actionsData.filter((a: any) => a.type === 'injection').length : 0,
-        achievements: achievementsData ? achievementsData.length : 0,
+        achievements: achievementsWithProgress ? achievementsWithProgress.filter(a => a.achieved).length : 0,
       });
-      setAchievements(achievementsData || []);
+      setAchievements(achievementsWithProgress || []);
     } catch (e: any) {
       setError(e.message || 'Ошибка загрузки профиля');
     } finally {

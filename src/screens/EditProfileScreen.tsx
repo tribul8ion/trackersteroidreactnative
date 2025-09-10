@@ -3,8 +3,8 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, Image, ActivityInd
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { updateProfile, Profile } from '../services/profile';
-import { supabase } from '../services/supabase';
+import type { Profile } from '../services/types';
+import { AuthService } from '../services/auth';
 import Animated, { 
   FadeIn, 
   SlideInUp, 
@@ -12,7 +12,7 @@ import Animated, {
   useAnimatedStyle, 
   withTiming 
 } from 'react-native-reanimated';
-import { checkAndGrantProfileAchievements } from '../services/achievements';
+import { AchievementsService } from '../services/achievements';
 import { colors } from '../theme/colors';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -257,7 +257,7 @@ export default function EditProfileScreen({ route, navigation }: { route: any, n
       setUsernameError(null);
       return;
     }
-    // Валидация длины и символов
+    // Валидация длины и символов (оффлайн)
     if (username.length < 3 || username.length > 20) {
       setUsernameError('От 3 до 20 символов');
       return;
@@ -266,18 +266,9 @@ export default function EditProfileScreen({ route, navigation }: { route: any, n
       setUsernameError('Только латиница, цифры и _');
       return;
     }
-    // Проверка уникальности
-    setCheckingUsername(true);
-    supabase.from('profile').select('id').eq('username', username).neq('id', profile.id).then(({ data, error }) => {
-      if (error) {
-        setUsernameError('Ошибка проверки');
-      } else if (data && data.length > 0) {
-        setUsernameError('Username уже занят');
-      } else {
-        setUsernameError(null);
-      }
-      setCheckingUsername(false);
-    });
+    // Оффлайн: пропускаем проверку уникальности среди других пользователей
+    setUsernameError(null);
+    setCheckingUsername(false);
   }, [username]);
 
   const pickImage = async () => {
@@ -294,14 +285,8 @@ export default function EditProfileScreen({ route, navigation }: { route: any, n
   };
 
   const uploadAvatar = async (uri: string, userId: string) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const fileExt = uri.split('.').pop();
-    const filePath = `avatars/${userId}.${fileExt}`;
-    let { error } = await supabase.storage.from('avatars').upload(filePath, blob, { upsert: true });
-    if (error) throw error;
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    return data.publicUrl;
+    // Оффлайн: сохраняем локальный URI (без загрузки)
+    return uri;
   };
 
   const handleSave = async () => {
@@ -315,7 +300,7 @@ export default function EditProfileScreen({ route, navigation }: { route: any, n
       if (avatarUrl && avatarUrl !== profile.avatar_url && !avatarUrl.startsWith('http')) {
         newAvatarUrl = await uploadAvatar(avatarUrl, profile.id);
       }
-      const { error } = await updateProfile(profile.id, {
+      const { success, error: updateError } = await AuthService.updateProfile({
         full_name: fullName,
         username,
         avatar_url: newAvatarUrl,
@@ -323,10 +308,10 @@ export default function EditProfileScreen({ route, navigation }: { route: any, n
         city,
         bio,
         gender,
-      });
-      if (error) throw error;
-      // Проверка и выдача достижений
-      await checkAndGrantProfileAchievements(profile.id, { username, bio });
+      } as any);
+      if (!success) throw updateError || new Error('Не удалось обновить профиль');
+      // Проверка и выдача достижений (оффлайн)
+      await AchievementsService.checkAndGrantAchievements();
       Alert.alert('Успех', 'Профиль обновлён!', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
