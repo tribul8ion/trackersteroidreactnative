@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   View, 
   StyleSheet, 
   Text, 
@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated
+  Animated as RNAnimated
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -419,9 +419,9 @@ const AuthScreen = () => {
                     </View>
                   </>
                 */}
-              </View>
+              </Animated.View>
             </Card>
-          </View>
+          </Animated.View>
 
           {/* Sign Up Link */}
           <Animated.View entering={FadeInUp.delay(1800)} style={styles.footer}>

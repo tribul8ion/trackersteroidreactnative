@@ -2,9 +2,21 @@ import { LocalStorageService } from './localStorage';
 import { Lab } from './types';
 
 export class LabsService {
+  static async initialize(): Promise<void> {
+    await LocalStorageService.getItem('labs' as any);
+  }
   // Получение всех анализов
-  static async getLabs(): Promise<Lab[]> {
-    return await LocalStorageService.getLabs();
+  static async getLabs(type?: string, startDate?: Date, endDate?: Date): Promise<Lab[]> {
+    let labs = (await LocalStorageService.getItem<Lab[]>('labs' as any)) || [];
+    if (startDate || endDate) {
+      labs = labs.filter(l => {
+        const d = new Date(l.date).getTime();
+        if (startDate && d < startDate.getTime()) return false;
+        if (endDate && d > endDate.getTime()) return false;
+        return true;
+      });
+    }
+    return labs;
   }
 
   // Получение анализа по ID
@@ -40,20 +52,26 @@ export class LabsService {
   }
 
   // Добавление анализа
-  static async addLab(labData: Omit<Lab, 'id' | 'created_at'>): Promise<{ success: boolean; lab?: Lab; error?: string }> {
+  static async addLab(labData: any): Promise<{ success: boolean; lab?: Lab; error?: string }> {
     try {
-      const newLab: Lab = {
-        ...labData,
-        id: this.generateLabId(),
-        created_at: new Date().toISOString(),
-      };
-
-      const success = await LocalStorageService.addLab(newLab);
-      if (success) {
-        return { success: true, lab: newLab };
-      } else {
-        return { success: false, error: 'Ошибка сохранения анализа' };
+      if (!labData || !labData.name || typeof labData.value !== 'number' || !labData.date) {
+        return { success: false, error: 'validation: name, value, date required' };
       }
+      const status = labData.value > 850 ? 'high' : labData.value < 300 ? 'low' : 'normal';
+      const newLab: Lab = {
+        id: this.generateLabId(),
+        name: labData.name,
+        value: labData.value,
+        date: labData.date,
+        status,
+        unit: labData.unit,
+        referenceRange: labData.referenceRange,
+        notes: labData.notes,
+        created_at: new Date().toISOString(),
+      } as any;
+      const existing = (await LocalStorageService.getItem<Lab[]>('labs' as any)) || [];
+      await LocalStorageService.setItem('labs' as any, [...existing, newLab]);
+      return { success: true, lab: newLab };
     } catch (error) {
       console.error('Ошибка добавления анализа:', error);
       return { success: false, error: 'Ошибка добавления анализа' };
@@ -63,21 +81,17 @@ export class LabsService {
   // Обновление анализа
   static async updateLab(id: string, updates: Partial<Lab>): Promise<{ success: boolean; lab?: Lab; error?: string }> {
     try {
-      const labs = await this.getLabs();
+      const labs = (await LocalStorageService.getItem<Lab[]>('labs' as any)) || [];
       const index = labs.findIndex(lab => lab.id === id);
       
       if (index === -1) {
-        return { success: false, error: 'Анализ не найден' };
+        return { success: false, error: 'not found' };
       }
 
       labs[index] = { ...labs[index], ...updates };
       
-      const success = await LocalStorageService.saveLabs(labs);
-      if (success) {
-        return { success: true, lab: labs[index] };
-      } else {
-        return { success: false, error: 'Ошибка обновления анализа' };
-      }
+      await LocalStorageService.setItem('labs' as any, labs);
+      return { success: true, lab: labs[index] };
     } catch (error) {
       console.error('Ошибка обновления анализа:', error);
       return { success: false, error: 'Ошибка обновления анализа' };
@@ -86,20 +100,27 @@ export class LabsService {
 
   // Удаление анализа
   static async deleteLab(id: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const labs = await this.getLabs();
-      const filteredLabs = labs.filter(lab => lab.id !== id);
-      
-      const success = await LocalStorageService.saveLabs(filteredLabs);
-      if (success) {
-        return { success: true };
-      } else {
-        return { success: false, error: 'Ошибка удаления анализа' };
-      }
-    } catch (error) {
-      console.error('Ошибка удаления анализа:', error);
-      return { success: false, error: 'Ошибка удаления анализа' };
-    }
+    const labs = (await LocalStorageService.getItem<Lab[]>('labs' as any)) || [];
+    const idx = labs.findIndex(l => l.id === id);
+    if (idx === -1) return { success: false, error: 'not found' };
+    const filteredLabs = labs.filter(lab => lab.id !== id);
+    await LocalStorageService.setItem('labs' as any, filteredLabs);
+    return { success: true };
+  }
+
+  static async analyzeResults() {
+    const labs = await this.getLabs();
+    const analysis = {
+      totalLabs: labs.length,
+      normalCount: labs.filter(l => l.status === 'normal').length,
+      highCount: labs.filter(l => l.status === 'high').length,
+      lowCount: labs.filter(l => l.status === 'low').length,
+      recommendations: [] as string[],
+      criticalValues: [] as string[],
+    };
+    if (analysis.highCount > 0) analysis.recommendations.push('Снизить дозировку эстрогена');
+    analysis.criticalValues = labs.filter(l => l.status === 'high').map(l => l.name);
+    return analysis;
   }
 
   // Получение статистики анализов

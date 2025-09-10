@@ -2,9 +2,13 @@ import { LocalStorageService } from './localStorage';
 import { Course, Compound } from './types';
 
 export class CoursesService {
+  static async initialize(): Promise<void> {
+    await LocalStorageService.getItem('courses' as any);
+  }
   // Получение всех курсов
   static async getCourses(): Promise<Course[]> {
-    return await LocalStorageService.getCourses();
+    const items = (await LocalStorageService.getItem<Course[]>('courses' as any)) || [];
+    return items.length ? items : await LocalStorageService.getCourses();
   }
 
   // Получение курса по ID
@@ -14,8 +18,14 @@ export class CoursesService {
   }
 
   // Создание нового курса
-  static async createCourse(courseData: Omit<Course, 'id' | 'created_at' | 'updated_at'>): Promise<{ success: boolean; course?: Course; error?: string }> {
+  static async createCourse(courseData: any): Promise<{ success: boolean; course?: Course; error?: string }> {
     try {
+      if (!courseData || typeof courseData.name !== 'string' || !courseData.name.trim()) {
+        return { success: false, error: 'validation: name is required' };
+      }
+      if (!courseData.status || !['active','completed','planned'].includes(String(courseData.status))) {
+        return { success: false, error: 'validation: status is required' };
+      }
       const newCourse: Course = {
         ...courseData,
         id: this.generateCourseId(),
@@ -23,12 +33,10 @@ export class CoursesService {
         updated_at: new Date().toISOString(),
       };
 
-      const success = await LocalStorageService.addCourse(newCourse);
-      if (success) {
-        return { success: true, course: newCourse };
-      } else {
-        return { success: false, error: 'Ошибка сохранения курса' };
-      }
+      const existing = (await LocalStorageService.getItem<Course[]>('courses' as any)) || [];
+      const updated = [...existing, newCourse];
+      await LocalStorageService.setItem('courses' as any, updated);
+      return { success: true, course: newCourse };
     } catch (error) {
       console.error('Ошибка создания курса:', error);
       return { success: false, error: 'Ошибка создания курса' };
@@ -43,13 +51,12 @@ export class CoursesService {
         updated_at: new Date().toISOString(),
       };
 
-      const success = await LocalStorageService.updateCourse(id, updatedData);
-      if (success) {
-        const course = await this.getCourseById(id);
-        return { success: true, course: course || undefined };
-      } else {
-        return { success: false, error: 'Ошибка обновления курса' };
-      }
+      const existing = (await LocalStorageService.getItem<Course[]>('courses' as any)) || [];
+      const index = existing.findIndex(c => c.id === id);
+      if (index === -1) return { success: false, error: 'not found' };
+      existing[index] = { ...existing[index], ...updatedData } as any;
+      await LocalStorageService.setItem('courses' as any, existing);
+      return { success: true, course: existing[index] };
     } catch (error) {
       console.error('Ошибка обновления курса:', error);
       return { success: false, error: 'Ошибка обновления курса' };
@@ -59,17 +66,20 @@ export class CoursesService {
   // Удаление курса
   static async deleteCourse(id: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const success = await LocalStorageService.deleteCourse(id);
-      if (success) {
-        return { success: true };
-      } else {
-        return { success: false, error: 'Ошибка удаления курса' };
-      }
+      const existing = (await LocalStorageService.getItem<Course[]>('courses' as any)) || [];
+      const index = existing.findIndex(c => c.id === id);
+      if (index === -1) return { success: false, error: 'not found' };
+      const updated = existing.filter(c => c.id !== id);
+      await LocalStorageService.setItem('courses' as any, updated);
+      return { success: true };
     } catch (error) {
       console.error('Ошибка удаления курса:', error);
       return { success: false, error: 'Ошибка удаления курса' };
     }
   }
+
+  // Aliases expected by tests
+  static async addCourse(courseData: any) { return this.createCourse(courseData); }
 
   // Получение активных курсов
   static async getActiveCourses(): Promise<Course[]> {

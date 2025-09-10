@@ -29,7 +29,7 @@ const CATEGORY_ICONS: Record<AchievementCategory, string> = {
   milestone: 'trophy',
 };
 
-const AllAchievementsScreen = () => {
+export const AllAchievementsScreen = () => {
   const [achievements, setAchievements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -507,4 +507,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AllAchievementsScreen; 
+export default AllAchievementsScreen;
