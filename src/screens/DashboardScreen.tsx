@@ -42,7 +42,7 @@ import { Portal, Dialog, Button } from 'react-native-paper';
 
 const { width, height } = Dimensions.get('window');
 
-// Справочник анализов теперь функция
+// Расширенный справочник анализов
 const LABS_REFERENCE = [
   { name: 'Тестостерон общий', type: 'hormone', unit: 'нмоль/л', norm_min: 8, norm_max: 29, color: colors.accent, priority: 1 },
   { name: 'Тестостерон свободный', type: 'hormone', unit: 'пг/мл', norm_min: 4.5, norm_max: 42, color: colors.blue, priority: 2 },
@@ -52,6 +52,22 @@ const LABS_REFERENCE = [
   { name: 'ЛГ', type: 'hormone', unit: 'МЕ/л', norm_min: 1.7, norm_max: 8.6, color: colors.warning, priority: 6 },
   { name: 'ФСГ', type: 'hormone', unit: 'МЕ/л', norm_min: 1, norm_max: 12, color: colors.purple, priority: 7 },
   { name: 'ДГТ', type: 'hormone', unit: 'нг/дл', norm_min: 30, norm_max: 85, color: colors.cyan, priority: 8 },
+  { name: 'Прогестерон', type: 'hormone', unit: 'нг/мл', norm_min: 0.1, norm_max: 0.7, color: colors.orangeDark, priority: 9 },
+  { name: 'Инсулин', type: 'hormone', unit: 'мкЕд/мл', norm_min: 2, norm_max: 25, color: colors.teal, priority: 10 },
+  { name: 'ИФР 1', type: 'hormone', unit: 'нг/мл', norm_min: 115, norm_max: 307, color: colors.pink, priority: 11 },
+  { name: 'Ферритин', type: 'blood', unit: 'нг/мл', norm_min: 30, norm_max: 400, color: colors.lime, priority: 12 },
+  { name: 'Витамин 25(OH) D', type: 'vitamin', unit: 'нг/мл', norm_min: 30, norm_max: 100, color: colors.orange, priority: 13 },
+  { name: 'ПСА общий', type: 'blood', unit: 'нг/мл', norm_min: 0, norm_max: 4, color: colors.indigo, priority: 14 },
+  { name: 'Гликированный гемоглобин (A1c)', type: 'blood', unit: '%', norm_min: 4, norm_max: 6, color: colors.teal, priority: 15 },
+  { name: 'АЛТ', type: 'liver', unit: 'Ед/л', norm_min: 7, norm_max: 56, color: colors.warning, priority: 16 },
+  { name: 'АСТ', type: 'liver', unit: 'Ед/л', norm_min: 10, norm_max: 40, color: colors.warning, priority: 17 },
+  { name: 'Билирубин общий', type: 'liver', unit: 'мкмоль/л', norm_min: 5, norm_max: 21, color: colors.yellow, priority: 18 },
+  { name: 'Креатинин', type: 'kidney', unit: 'мкмоль/л', norm_min: 62, norm_max: 106, color: colors.blue, priority: 19 },
+  { name: 'Мочевина', type: 'kidney', unit: 'ммоль/л', norm_min: 2.5, norm_max: 8.3, color: colors.blue, priority: 20 },
+  { name: 'Общий холестерин', type: 'lipid', unit: 'ммоль/л', norm_min: 3.0, norm_max: 5.2, color: colors.purple, priority: 21 },
+  { name: 'ЛПВП', type: 'lipid', unit: 'ммоль/л', norm_min: 1.0, norm_max: 2.2, color: colors.green, priority: 22 },
+  { name: 'ЛПНП', type: 'lipid', unit: 'ммоль/л', norm_min: 0, norm_max: 3.0, color: colors.error, priority: 23 },
+  { name: 'Триглицериды', type: 'lipid', unit: 'ммоль/л', norm_min: 0, norm_max: 1.7, color: colors.orange, priority: 24 },
 ];
 
 const styles = StyleSheet.create({
@@ -341,10 +357,12 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
-    gap: 16,
+    flexWrap: 'wrap',
+    gap: 12,
   },
   metricItem: {
     flex: 1,
+    minWidth: (width - 80) / 2,
     gap: 8,
   },
   metricHeader: {
@@ -353,13 +371,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: colors.white,
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.gray,
+    textAlign: 'center',
   },
   // Alerts Widget Styles
   alertsWidget: {
@@ -485,6 +504,78 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: colors.gray,
+  },
+  // Course Stats Widget Styles
+  courseStatsWidget: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  courseStatsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 16,
+  },
+  courseStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  courseStatItem: {
+    flex: 1,
+    minWidth: (width - 80) / 2,
+    alignItems: 'center',
+    backgroundColor: colors.grayLight + '20',
+    borderRadius: 12,
+    padding: 12,
+  },
+  courseStatIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.accent + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  courseStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 4,
+  },
+  courseStatLabel: {
+    fontSize: 11,
+    color: colors.gray,
+    textAlign: 'center',
+  },
+  courseProgressSection: {
+    marginTop: 8,
+  },
+  courseProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  courseProgressLabel: {
+    fontSize: 14,
+    color: colors.gray,
+    fontWeight: '500',
+  },
+  courseProgressValue: {
+    fontSize: 14,
+    color: colors.accent,
+    fontWeight: 'bold',
+  },
+  courseProgressText: {
+    fontSize: 12,
+    color: colors.gray,
+    textAlign: 'center',
+    marginTop: 8,
   },
   // Quick Actions Styles
   quickActions: {
@@ -1052,10 +1143,9 @@ const MiniCalendar = ({ events, onDatePress, selectedDate }: {
   );
 };
 
-// Компонент статистики здоровья
-const HealthMetrics = ({ labs, actions }: { labs: any[]; actions: any[] }) => {
+// Улучшенный компонент статистики здоровья
+const HealthMetrics = ({ labs, actions, course }: { labs: any[]; actions: any[]; course: any }) => {
   const getHealthScore = () => {
-    // Простой алгоритм расчета общего показателя здоровья
     const recentLabs = labs.filter(lab => {
       const labDate = new Date(lab.date);
       const monthAgo = new Date();
@@ -1098,7 +1188,6 @@ const HealthMetrics = ({ labs, actions }: { labs: any[]; actions: any[] }) => {
       return actionDate >= weekAgo;
     });
 
-    // Простой расчет на основе регулярности
     const daysWithActions = new Set(
       recentActions.map(action => action.timestamp.slice(0, 10))
     ).size;
@@ -1106,8 +1195,79 @@ const HealthMetrics = ({ labs, actions }: { labs: any[]; actions: any[] }) => {
     return Math.round((daysWithActions / 7) * 100);
   };
 
+  const getCourseCompliance = () => {
+    if (!course || !course.schedule) return 0;
+    
+    const today = new Date();
+    const weekAgo = new Date();
+    weekAgo.setDate(today.getDate() - 7);
+    
+    const recentActions = actions.filter(action => {
+      const actionDate = new Date(action.timestamp);
+      return actionDate >= weekAgo;
+    });
+
+    // Подсчитываем запланированные действия за неделю
+    let plannedActions = 0;
+    let completedActions = 0;
+    
+    try {
+      const schedule = JSON.parse(course.schedule);
+      const compounds = JSON.parse(course.compounds);
+      
+      for (let i = 0; i < 7; i++) {
+        const checkDate = new Date(weekAgo);
+        checkDate.setDate(weekAgo.getDate() + i);
+        const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][checkDate.getDay()];
+        
+        compounds.forEach((comp: any) => {
+          const sched = schedule[comp.key];
+          if (sched && sched.days && sched.days.includes(dayKey)) {
+            plannedActions += sched.timesPerDay || 1;
+          }
+        });
+      }
+      
+      completedActions = recentActions.length;
+    } catch {}
+    
+    return plannedActions > 0 ? Math.round((completedActions / plannedActions) * 100) : 0;
+  };
+
+  const getRiskAssessment = () => {
+    const recentLabs = labs.filter(lab => {
+      const labDate = new Date(lab.date);
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      return labDate >= monthAgo;
+    });
+
+    let riskFactors = 0;
+    let totalFactors = 0;
+
+    // Проверяем критические показатели
+    const criticalLabs = ['АЛТ', 'АСТ', 'Билирубин общий', 'Креатинин', 'ПСА общий'];
+    criticalLabs.forEach(labName => {
+      const labType = LABS_REFERENCE.find(l => l.name === labName);
+      if (labType) {
+        totalFactors++;
+        const labValues = recentLabs.filter(lab => lab.name === labName);
+        if (labValues.length > 0) {
+          const latest = labValues[labValues.length - 1];
+          if (latest.value > labType.norm_max * 1.5) {
+            riskFactors++;
+          }
+        }
+      }
+    });
+
+    return totalFactors > 0 ? Math.round(((totalFactors - riskFactors) / totalFactors) * 100) : 100;
+  };
+
   const healthScore = getHealthScore();
   const activityScore = getActivityScore();
+  const complianceScore = getCourseCompliance();
+  const riskScore = getRiskAssessment();
 
   return (
     <View style={styles.healthMetrics}>
@@ -1136,6 +1296,32 @@ const HealthMetrics = ({ labs, actions }: { labs: any[]; actions: any[] }) => {
           <ProgressBar 
             value={activityScore} 
             color={colors.accent}
+            height={4}
+          />
+        </View>
+        
+        <View style={styles.metricItem}>
+          <View style={styles.metricHeader}>
+            <FontAwesome5 name="check-circle" size={20} color={colors.success} />
+            <Text style={styles.metricValue}>{complianceScore}%</Text>
+          </View>
+          <Text style={styles.metricLabel}>Соблюдение</Text>
+          <ProgressBar 
+            value={complianceScore} 
+            color={complianceScore >= 80 ? colors.success : complianceScore >= 60 ? colors.warning : colors.error}
+            height={4}
+          />
+        </View>
+        
+        <View style={styles.metricItem}>
+          <View style={styles.metricHeader}>
+            <FontAwesome5 name="shield-alt" size={20} color={colors.blue} />
+            <Text style={styles.metricValue}>{riskScore}%</Text>
+          </View>
+          <Text style={styles.metricLabel}>Безопасность</Text>
+          <ProgressBar 
+            value={riskScore} 
+            color={riskScore >= 80 ? colors.success : riskScore >= 60 ? colors.warning : colors.error}
             height={4}
           />
         </View>
@@ -1233,7 +1419,7 @@ const AlertsWidget = ({
   );
 };
 
-// Компонент графика прогресса
+// Улучшенный компонент графика прогресса
 const ProgressChart = ({ actions, course }: { actions: any[]; course: any }) => {
   const getWeeklyProgress = () => {
     if (!course || !course.startDate) return [];
@@ -1270,9 +1456,32 @@ const ProgressChart = ({ actions, course }: { actions: any[]; course: any }) => 
     return weeks;
   };
 
-  const weeklyData = getWeeklyProgress();
+  const getMonthlyTrend = () => {
+    const monthlyData = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+      
+      const monthActions = actions.filter(action => {
+        const actionDate = new Date(action.timestamp);
+        return actionDate >= monthStart && actionDate <= monthEnd;
+      });
+      
+      monthlyData.push({
+        month: monthStart.toLocaleDateString('ru', { month: 'short' }),
+        value: monthActions.length
+      });
+    }
+    
+    return monthlyData;
+  };
 
-  if (weeklyData.length === 0) return null;
+  const weeklyData = getWeeklyProgress();
+  const monthlyData = getMonthlyTrend();
+
+  if (weeklyData.length === 0 && monthlyData.length === 0) return null;
 
   return (
     <View style={styles.progressChart}>
@@ -1300,6 +1509,105 @@ const ProgressChart = ({ actions, course }: { actions: any[]; course: any }) => 
           <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
           <Text style={styles.legendText}>Общая активность</Text>
         </View>
+      </View>
+    </View>
+  );
+};
+
+// Новый компонент для отображения детальной статистики курса
+const CourseStatsWidget = ({ course, actions, labs }: { course: any; actions: any[]; labs: any[] }) => {
+  const getCourseStats = () => {
+    if (!course) return null;
+
+    const startDate = new Date(course.startDate);
+    const now = new Date();
+    const daysPassed = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const totalDays = (course.durationWeeks || 12) * 7;
+    const progress = Math.min(100, Math.round((daysPassed / totalDays) * 100));
+
+    // Статистика по действиям
+    const totalInjections = actions.filter(a => a.type === 'injection').length;
+    const totalTablets = actions.filter(a => a.type === 'tablet').length;
+    const totalLabs = labs.length;
+
+    // Статистика за последние 7 дней
+    const weekAgo = new Date();
+    weekAgo.setDate(now.getDate() - 7);
+    const recentActions = actions.filter(action => {
+      const actionDate = new Date(action.timestamp);
+      return actionDate >= weekAgo;
+    });
+
+    // Средняя активность в день
+    const avgDailyActivity = recentActions.length / 7;
+
+    return {
+      progress,
+      daysPassed,
+      totalDays,
+      totalInjections,
+      totalTablets,
+      totalLabs,
+      avgDailyActivity,
+      recentActions: recentActions.length
+    };
+  };
+
+  const stats = getCourseStats();
+  if (!stats) return null;
+
+  return (
+    <View style={styles.courseStatsWidget}>
+      <Text style={styles.courseStatsTitle}>Статистика курса</Text>
+      
+      <View style={styles.courseStatsGrid}>
+        <View style={styles.courseStatItem}>
+          <View style={styles.courseStatIcon}>
+            <FontAwesome5 name="calendar-day" size={16} color={colors.accent} />
+          </View>
+          <Text style={styles.courseStatValue}>{stats.daysPassed}</Text>
+          <Text style={styles.courseStatLabel}>Дней</Text>
+        </View>
+        
+        <View style={styles.courseStatItem}>
+          <View style={styles.courseStatIcon}>
+            <FontAwesome5 name="syringe" size={16} color={colors.blue} />
+          </View>
+          <Text style={styles.courseStatValue}>{stats.totalInjections}</Text>
+          <Text style={styles.courseStatLabel}>Инъекций</Text>
+        </View>
+        
+        <View style={styles.courseStatItem}>
+          <View style={styles.courseStatIcon}>
+            <FontAwesome5 name="pills" size={16} color={colors.orange} />
+          </View>
+          <Text style={styles.courseStatValue}>{stats.totalTablets}</Text>
+          <Text style={styles.courseStatLabel}>Таблеток</Text>
+        </View>
+        
+        <View style={styles.courseStatItem}>
+          <View style={styles.courseStatIcon}>
+            <FontAwesome5 name="vial" size={16} color={colors.success} />
+          </View>
+          <Text style={styles.courseStatValue}>{stats.totalLabs}</Text>
+          <Text style={styles.courseStatLabel}>Анализов</Text>
+        </View>
+      </View>
+      
+      <View style={styles.courseProgressSection}>
+        <View style={styles.courseProgressHeader}>
+          <Text style={styles.courseProgressLabel}>Прогресс курса</Text>
+          <Text style={styles.courseProgressValue}>{stats.progress}%</Text>
+        </View>
+        <ProgressBar 
+          value={stats.progress} 
+          color={colors.accent}
+          height={6}
+          animated
+        />
+        <Text style={styles.courseProgressText}>
+          {stats.daysPassed} из {stats.totalDays} дней
+        </Text>
       </View>
     </View>
   );
@@ -2137,16 +2445,23 @@ export default function Dashboard() {
         </Animated.View>
 
         {/* Health Metrics */}
-        {/* <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
-          <HealthMetrics labs={labs} actions={actions} />
-        </Animated.View> */}
+        <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
+          <HealthMetrics labs={labs} actions={actions} course={currentCourse} />
+        </Animated.View>
+
+        {/* Course Stats Widget */}
+        {currentCourse && (
+          <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
+            <CourseStatsWidget course={currentCourse} actions={actions} labs={labs} />
+          </Animated.View>
+        )}
 
         {/* Progress Chart */}
-        {/* {actions.length > 0 && (
+        {actions.length > 0 && (
           <Animated.View entering={FadeIn.delay(100)} style={styles.section}>
             <ProgressChart actions={actions} course={currentCourse} />
           </Animated.View>
-        )} */}
+        )}
 
         {/* Recent Labs Section */}
         <Animated.View entering={FadeIn.delay(100)} style={styles.section}>

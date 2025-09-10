@@ -39,12 +39,46 @@ const LAB_CATEGORIES = [
   { key: 'hormone', label: 'Гормоны', icon: 'dna' },
   { key: 'blood', label: 'Кровь', icon: 'tint' },
   { key: 'vitamin', label: 'Витамины', icon: 'leaf' },
+  { key: 'liver', label: 'Печень', icon: 'liver' },
+  { key: 'kidney', label: 'Почки', icon: 'heartbeat' },
+  { key: 'lipid', label: 'Липиды', icon: 'oil-can' },
+  { key: 'muscle', label: 'Мышцы', icon: 'dumbbell' },
 ];
 
 function getToday() {
   const d = new Date();
   return d.toISOString().slice(0, 10);
 }
+
+// Компонент поиска
+const SearchBar = ({ 
+  searchQuery, 
+  onSearchChange 
+}: {
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+}) => (
+  <View style={styles.searchContainer}>
+    <View style={styles.searchInputContainer}>
+      <FontAwesome5 name="search" size={16} color={colors.gray} style={styles.searchIcon} />
+      <TextInput
+        style={styles.searchInput}
+        value={searchQuery}
+        onChangeText={onSearchChange}
+        placeholder="Поиск анализов..."
+        placeholderTextColor={colors.gray}
+      />
+      {searchQuery.length > 0 && (
+        <TouchableOpacity 
+          style={styles.clearButton}
+          onPress={() => onSearchChange('')}
+        >
+          <FontAwesome5 name="times" size={14} color={colors.gray} />
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
 
 // Компонент фильтра категорий
 const CategoryFilter = ({ 
@@ -100,7 +134,25 @@ const LabsSummary = ({ groupedLabs }: { groupedLabs: any }) => {
       return lab.latestValue.value < lab.labType.norm_min;
     }).length;
 
-    return { totalLabs, inNorm, aboveNorm, belowNorm };
+    // Статистика по категориям
+    const categoryStats = LAB_CATEGORIES.slice(1).map(category => {
+      const categoryLabs = Object.values(groupedLabs).filter((lab: any) => 
+        lab.labType.type === category.key && lab.latestValue
+      );
+      const categoryInNorm = categoryLabs.filter((lab: any) => {
+        const value = lab.latestValue.value;
+        return value >= lab.labType.norm_min && value <= lab.labType.norm_max;
+      }).length;
+      
+      return {
+        category: category.label,
+        total: categoryLabs.length,
+        inNorm: categoryInNorm,
+        percentage: categoryLabs.length > 0 ? Math.round((categoryInNorm / categoryLabs.length) * 100) : 0
+      };
+    });
+
+    return { totalLabs, inNorm, aboveNorm, belowNorm, categoryStats };
   };
 
   const stats = getStats();
@@ -108,6 +160,8 @@ const LabsSummary = ({ groupedLabs }: { groupedLabs: any }) => {
   return (
     <Animated.View entering={FadeIn.delay(100)} style={styles.summaryContainer}>
       <Text style={styles.summaryTitle}>Сводка анализов</Text>
+      
+      {/* Основная статистика */}
       <View style={styles.summaryGrid}>
         <View style={styles.summaryItem}>
           <View style={[styles.summaryIcon, { backgroundColor: colors.accent + '20' }]}>
@@ -141,6 +195,35 @@ const LabsSummary = ({ groupedLabs }: { groupedLabs: any }) => {
           <Text style={styles.summaryLabel}>Ниже</Text>
         </View>
       </View>
+
+      {/* Статистика по категориям */}
+      {stats.categoryStats.some(cat => cat.total > 0) && (
+        <View style={styles.categoryStatsSection}>
+          <Text style={styles.categoryStatsTitle}>По категориям</Text>
+          <View style={styles.categoryStatsGrid}>
+            {stats.categoryStats.filter(cat => cat.total > 0).map((category, index) => (
+              <View key={category.category} style={styles.categoryStatItem}>
+                <Text style={styles.categoryStatLabel}>{category.category}</Text>
+                <View style={styles.categoryStatProgress}>
+                  <View 
+                    style={[
+                      styles.categoryStatBar, 
+                      { 
+                        width: `${category.percentage}%`,
+                        backgroundColor: category.percentage >= 80 ? colors.success : 
+                                       category.percentage >= 60 ? colors.warning : colors.error
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={styles.categoryStatValue}>
+                  {category.inNorm}/{category.total} ({category.percentage}%)
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </Animated.View>
   );
 };
@@ -837,6 +920,7 @@ const AddValueModal = ({
 };
 
 const LABS_REFERENCE = [
+  // Гормоны
   { name: 'Тестостерон общий', type: 'hormone', unit: 'нмоль/л', norm_min: 8, norm_max: 29, color: colors.accent, priority: 1 },
   { name: 'Тестостерон свободный', type: 'hormone', unit: 'пг/мл', norm_min: 4.5, norm_max: 42, color: colors.blue, priority: 2 },
   { name: 'Эстрадиол', type: 'hormone', unit: 'пг/мл', norm_min: 11, norm_max: 44, color: colors.orange, priority: 3 },
@@ -848,10 +932,59 @@ const LABS_REFERENCE = [
   { name: 'Прогестерон', type: 'hormone', unit: 'нг/мл', norm_min: 0.1, norm_max: 0.7, color: colors.orangeDark, priority: 9 },
   { name: 'Инсулин', type: 'hormone', unit: 'мкЕд/мл', norm_min: 2, norm_max: 25, color: colors.teal, priority: 10 },
   { name: 'ИФР 1', type: 'hormone', unit: 'нг/мл', norm_min: 115, norm_max: 307, color: colors.pink, priority: 11 },
-  { name: 'Ферритин', type: 'blood', unit: 'нг/мл', norm_min: 30, norm_max: 400, color: colors.lime, priority: 12 },
-  { name: 'Витамин 25(OH) D', type: 'vitamin', unit: 'нг/мл', norm_min: 30, norm_max: 100, color: colors.orange, priority: 13 },
-  { name: 'ПСА общий', type: 'blood', unit: 'нг/мл', norm_min: 0, norm_max: 4, color: colors.indigo, priority: 14 },
-  { name: 'Гликированный гемоглобин (A1c)', type: 'blood', unit: '%', norm_min: 4, norm_max: 6, color: colors.teal, priority: 15 },
+  { name: 'Кортизол', type: 'hormone', unit: 'мкг/дл', norm_min: 6, norm_max: 23, color: colors.yellow, priority: 12 },
+  { name: 'ТТГ', type: 'hormone', unit: 'мкМЕ/мл', norm_min: 0.4, norm_max: 4, color: colors.green, priority: 13 },
+  { name: 'Т4 свободный', type: 'hormone', unit: 'нг/дл', norm_min: 0.8, norm_max: 1.8, color: colors.blue, priority: 14 },
+  { name: 'Т3 свободный', type: 'hormone', unit: 'пг/мл', norm_min: 2.3, norm_max: 4.2, color: colors.cyan, priority: 15 },
+  
+  // Кровь
+  { name: 'Гемоглобин', type: 'blood', unit: 'г/л', norm_min: 130, norm_max: 175, color: colors.error, priority: 16 },
+  { name: 'Гематокрит', type: 'blood', unit: '%', norm_min: 40, norm_max: 52, color: colors.error, priority: 17 },
+  { name: 'Эритроциты', type: 'blood', unit: '×10¹²/л', norm_min: 4.3, norm_max: 5.7, color: colors.error, priority: 18 },
+  { name: 'Лейкоциты', type: 'blood', unit: '×10⁹/л', norm_min: 4.5, norm_max: 11, color: colors.blue, priority: 19 },
+  { name: 'Тромбоциты', type: 'blood', unit: '×10⁹/л', norm_min: 150, norm_max: 450, color: colors.purple, priority: 20 },
+  { name: 'СОЭ', type: 'blood', unit: 'мм/ч', norm_min: 0, norm_max: 20, color: colors.orange, priority: 21 },
+  { name: 'Гликированный гемоглобин (A1c)', type: 'blood', unit: '%', norm_min: 4, norm_max: 6, color: colors.teal, priority: 22 },
+  { name: 'Глюкоза', type: 'blood', unit: 'ммоль/л', norm_min: 3.9, norm_max: 5.6, color: colors.green, priority: 23 },
+  { name: 'Ферритин', type: 'blood', unit: 'нг/мл', norm_min: 30, norm_max: 400, color: colors.lime, priority: 24 },
+  { name: 'ПСА общий', type: 'blood', unit: 'нг/мл', norm_min: 0, norm_max: 4, color: colors.indigo, priority: 25 },
+  
+  // Витамины и минералы
+  { name: 'Витамин 25(OH) D', type: 'vitamin', unit: 'нг/мл', norm_min: 30, norm_max: 100, color: colors.orange, priority: 26 },
+  { name: 'Витамин B12', type: 'vitamin', unit: 'пг/мл', norm_min: 200, norm_max: 900, color: colors.blue, priority: 27 },
+  { name: 'Фолиевая кислота', type: 'vitamin', unit: 'нг/мл', norm_min: 3, norm_max: 17, color: colors.green, priority: 28 },
+  { name: 'Магний', type: 'vitamin', unit: 'мг/дл', norm_min: 1.7, norm_max: 2.2, color: colors.purple, priority: 29 },
+  { name: 'Цинк', type: 'vitamin', unit: 'мкг/дл', norm_min: 70, norm_max: 120, color: colors.cyan, priority: 30 },
+  { name: 'Селен', type: 'vitamin', unit: 'мкг/л', norm_min: 70, norm_max: 150, color: colors.yellow, priority: 31 },
+  
+  // Печень
+  { name: 'АЛТ', type: 'liver', unit: 'Ед/л', norm_min: 7, norm_max: 56, color: colors.warning, priority: 32 },
+  { name: 'АСТ', type: 'liver', unit: 'Ед/л', norm_min: 10, norm_max: 40, color: colors.warning, priority: 33 },
+  { name: 'Билирубин общий', type: 'liver', unit: 'мкмоль/л', norm_min: 5, norm_max: 21, color: colors.yellow, priority: 34 },
+  { name: 'Билирубин прямой', type: 'liver', unit: 'мкмоль/л', norm_min: 0, norm_max: 5, color: colors.orange, priority: 35 },
+  { name: 'ГГТ', type: 'liver', unit: 'Ед/л', norm_min: 8, norm_max: 61, color: colors.pink, priority: 36 },
+  { name: 'ЩФ', type: 'liver', unit: 'Ед/л', norm_min: 40, norm_max: 150, color: colors.teal, priority: 37 },
+  
+  // Почки
+  { name: 'Креатинин', type: 'kidney', unit: 'мкмоль/л', norm_min: 62, norm_max: 106, color: colors.blue, priority: 38 },
+  { name: 'Мочевина', type: 'kidney', unit: 'ммоль/л', norm_min: 2.5, norm_max: 8.3, color: colors.blue, priority: 39 },
+  { name: 'Мочевая кислота', type: 'kidney', unit: 'мкмоль/л', norm_min: 208, norm_max: 428, color: colors.purple, priority: 40 },
+  { name: 'Кальций', type: 'kidney', unit: 'мг/дл', norm_min: 8.5, norm_max: 10.5, color: colors.cyan, priority: 41 },
+  { name: 'Фосфор', type: 'kidney', unit: 'мг/дл', norm_min: 2.5, norm_max: 4.5, color: colors.green, priority: 42 },
+  
+  // Липиды
+  { name: 'Общий холестерин', type: 'lipid', unit: 'ммоль/л', norm_min: 3.0, norm_max: 5.2, color: colors.purple, priority: 43 },
+  { name: 'ЛПВП', type: 'lipid', unit: 'ммоль/л', norm_min: 1.0, norm_max: 2.2, color: colors.green, priority: 44 },
+  { name: 'ЛПНП', type: 'lipid', unit: 'ммоль/л', norm_min: 0, norm_max: 3.0, color: colors.error, priority: 45 },
+  { name: 'Триглицериды', type: 'lipid', unit: 'ммоль/л', norm_min: 0, norm_max: 1.7, color: colors.orange, priority: 46 },
+  { name: 'Аполипопротеин A1', type: 'lipid', unit: 'г/л', norm_min: 1.0, norm_max: 2.0, color: colors.green, priority: 47 },
+  { name: 'Аполипопротеин B', type: 'lipid', unit: 'г/л', norm_min: 0.6, norm_max: 1.4, color: colors.error, priority: 48 },
+  
+  // Мышцы и сердце
+  { name: 'КФК', type: 'muscle', unit: 'Ед/л', norm_min: 30, norm_max: 200, color: colors.pink, priority: 49 },
+  { name: 'ЛДГ', type: 'muscle', unit: 'Ед/л', norm_min: 140, norm_max: 280, color: colors.orange, priority: 50 },
+  { name: 'Тропонин I', type: 'muscle', unit: 'нг/мл', norm_min: 0, norm_max: 0.04, color: colors.error, priority: 51 },
+  { name: 'МВ-КФК', type: 'muscle', unit: 'Ед/л', norm_min: 0, norm_max: 25, color: colors.pink, priority: 52 },
 ];
 
 const styles = StyleSheet.create({
@@ -924,6 +1057,72 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: 12,
     color: colors.gray,
+  },
+  categoryStatsSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.grayLight,
+  },
+  categoryStatsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.white,
+    marginBottom: 12,
+  },
+  categoryStatsGrid: {
+    gap: 8,
+  },
+  categoryStatItem: {
+    gap: 4,
+  },
+  categoryStatLabel: {
+    fontSize: 12,
+    color: colors.gray,
+    fontWeight: '500',
+  },
+  categoryStatProgress: {
+    height: 4,
+    backgroundColor: colors.grayLight,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  categoryStatBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  categoryStatValue: {
+    fontSize: 10,
+    color: colors.gray,
+    textAlign: 'right',
+  },
+  searchContainer: {
+    backgroundColor: colors.card,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grayLight,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.grayLight + '20',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.white,
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   categoryFilter: {
     backgroundColor: colors.card,
@@ -1563,6 +1762,12 @@ const LabsScreen = () => {
         <>
           {/* Сводка */}
           <LabsSummary groupedLabs={groupedLabs} />
+
+          {/* Поиск */}
+          <SearchBar 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
 
           {/* Фильтры */}
           <CategoryFilter 

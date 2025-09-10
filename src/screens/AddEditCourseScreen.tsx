@@ -44,7 +44,11 @@ const COMPOUNDS = [
     tHalf: '5-7 дн', 
     tox: 1, 
     features: 'Базовый препарат с длительным действием. Стабильный уровень гормона, инъекции 1-2 раза в неделю. Подходит для первого курса.', 
-    category: 'test' 
+    category: 'test',
+    concentration: 250,
+    unit: 'мг/мл',
+    recommendedDose: '250-500',
+    doseUnit: 'мг/нед'
   },
   { 
     key: 'test-c', 
@@ -53,7 +57,11 @@ const COMPOUNDS = [
     tHalf: '5-6 дн', 
     tox: 1, 
     features: 'Аналог энантата с похожими свойствами. Популярен в США. Практически идентичен энантату по действию.', 
-    category: 'test' 
+    category: 'test',
+    concentration: 200,
+    unit: 'мг/мл',
+    recommendedDose: '200-400',
+    doseUnit: 'мг/нед'
   },
   { 
     key: 'test-p', 
@@ -62,7 +70,11 @@ const COMPOUNDS = [
     tHalf: '1-2 дн', 
     tox: 1, 
     features: 'Короткий эфир тестостерона. Быстрое начало действия, требует частых инъекций через день. Меньше задержки воды.', 
-    category: 'test' 
+    category: 'test',
+    concentration: 100,
+    unit: 'мг/мл',
+    recommendedDose: '100-200',
+    doseUnit: 'мг/нед'
   },
   { 
     key: 'sustanon', 
@@ -71,7 +83,24 @@ const COMPOUNDS = [
     tHalf: '1-14 дн', 
     tox: 1, 
     features: 'Смесь 4 эфиров тестостерона. Нестабильные пики концентрации, сложно контролировать уровень в крови.', 
-    category: 'test' 
+    category: 'test',
+    concentration: 250,
+    unit: 'мг/мл',
+    recommendedDose: '250-500',
+    doseUnit: 'мг/нед'
+  },
+  { 
+    key: 'test-u', 
+    label: 'Тестостерон Ундеканоат', 
+    form: 'Инъекция', 
+    tHalf: '20-30 дн', 
+    tox: 1, 
+    features: 'Самый длинный эфир тестостерона. Инъекции раз в 2-3 недели. Подходит для TRT, сложен для курсов.', 
+    category: 'test',
+    concentration: 250,
+    unit: 'мг/мл',
+    recommendedDose: '250-500',
+    doseUnit: 'мг/нед'
   },
   
   // Массонаборные ААС
@@ -82,7 +111,11 @@ const COMPOUNDS = [
     tHalf: '4-6 ч', 
     tox: 3, 
     features: 'Сильно ароматизируется в эстроген. Быстрый набор массы с задержкой воды. Высокая нагрузка на печень.', 
-    category: 'mass' 
+    category: 'mass',
+    concentration: 10,
+    unit: 'мг/таб',
+    recommendedDose: '20-50',
+    doseUnit: 'мг/день'
   },
   { 
     key: 'turinabol', 
@@ -288,6 +321,138 @@ const SAFETY_WARNINGS = [
   { key: 'prolactin', text: 'Возможен рост пролактина (нандролоны, тренболон)' },
   { key: 'mental', text: 'Возможны перепады настроения, агрессия, бессонница' },
 ];
+
+// Компонент рекомендаций
+const Recommendations = ({ courseType, selectedCompounds }: { courseType: string | null; selectedCompounds: string[] }) => {
+  const getRecommendations = () => {
+    if (!courseType) return [];
+    
+    const recommendations = [];
+    
+    switch (courseType) {
+      case 'mass':
+        if (!selectedCompounds.includes('test-e') && !selectedCompounds.includes('test-c')) {
+          recommendations.push({
+            type: 'warning',
+            icon: 'warning',
+            title: 'Рекомендуется база',
+            text: 'Для курса на массу рекомендуется добавить тестостерон как базовый препарат'
+          });
+        }
+        if (selectedCompounds.includes('methan') && !selectedCompounds.includes('anastrozole')) {
+          recommendations.push({
+            type: 'error',
+            icon: 'alert-circle',
+            title: 'Нужен антиэстроген',
+            text: 'Метан сильно ароматизируется, необходим анастрозол или тамоксифен'
+          });
+        }
+        break;
+        
+      case 'cut':
+        if (selectedCompounds.includes('tren-a') || selectedCompounds.includes('tren-e')) {
+          recommendations.push({
+            type: 'warning',
+            icon: 'warning',
+            title: 'Тренболон - для опытных',
+            text: 'Тренболон - очень мощный препарат. Убедитесь, что у вас есть опыт'
+          });
+        }
+        break;
+    }
+    
+    return recommendations;
+  };
+
+  const recommendations = getRecommendations();
+  if (recommendations.length === 0) return null;
+
+  return (
+    <View style={styles.recommendationsContainer}>
+      <Text style={styles.recommendationsTitle}>Рекомендации</Text>
+      {recommendations.map((rec, index) => (
+        <View key={index} style={[styles.recommendationItem, { 
+          backgroundColor: rec.type === 'error' ? colors.error + '20' : colors.warning + '20' 
+        }]}>
+          <Ionicons 
+            name={rec.icon} 
+            size={20} 
+            color={rec.type === 'error' ? colors.error : colors.warning} 
+          />
+          <View style={styles.recommendationContent}>
+            <Text style={[styles.recommendationTitle, { 
+              color: rec.type === 'error' ? colors.error : colors.warning 
+            }]}>
+              {rec.title}
+            </Text>
+            <Text style={styles.recommendationText}>{rec.text}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// Компонент поиска препаратов
+const CompoundSearch = ({ 
+  searchQuery, 
+  onSearchChange, 
+  selectedCategory, 
+  onCategoryChange 
+}: { 
+  searchQuery: string; 
+  onSearchChange: (query: string) => void; 
+  selectedCategory: string | null; 
+  onCategoryChange: (category: string | null) => void; 
+}) => (
+  <View style={styles.searchContainer}>
+    <View style={styles.searchInputContainer}>
+      <Ionicons name="search" size={20} color={colors.gray} style={styles.searchIcon} />
+      <TextInput
+        style={styles.searchInput}
+        value={searchQuery}
+        onChangeText={onSearchChange}
+        placeholder="Поиск препаратов..."
+        placeholderTextColor={colors.gray}
+      />
+      {searchQuery.length > 0 && (
+        <TouchableOpacity 
+          style={styles.clearButton}
+          onPress={() => onSearchChange('')}
+        >
+          <Ionicons name="close" size={20} color={colors.gray} />
+        </TouchableOpacity>
+      )}
+    </View>
+    
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+      <TouchableOpacity
+        style={[styles.categoryChip, !selectedCategory && styles.categoryChipActive]}
+        onPress={() => onCategoryChange(null)}
+      >
+        <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextActive]}>
+          Все
+        </Text>
+      </TouchableOpacity>
+      {COMPOUND_CATEGORIES.map(category => (
+        <TouchableOpacity
+          key={category.key}
+          style={[styles.categoryChip, selectedCategory === category.key && styles.categoryChipActive]}
+          onPress={() => onCategoryChange(category.key)}
+        >
+          <Ionicons 
+            name={category.icon} 
+            size={16} 
+            color={selectedCategory === category.key ? colors.accent : colors.gray} 
+          />
+          <Text style={[styles.categoryChipText, selectedCategory === category.key && styles.categoryChipTextActive]}>
+            {category.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  </View>
+);
 
 const AddEditCourseScreen = () => {
   const route = useRoute();
@@ -1847,6 +2012,93 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footerBtnTextSecondary: {
+    color: colors.accent,
+  },
+  
+  // Новые стили для рекомендаций и поиска
+  recommendationsContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  recommendationsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.white,
+    marginBottom: 12,
+  },
+  recommendationItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 12,
+  },
+  recommendationContent: {
+    flex: 1,
+  },
+  recommendationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  recommendationText: {
+    fontSize: 12,
+    color: colors.gray,
+    lineHeight: 16,
+  },
+  searchContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.grayLight + '20',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.white,
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  categoryScroll: {
+    marginBottom: 8,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: colors.grayLight + '20',
+    gap: 6,
+  },
+  categoryChipActive: {
+    backgroundColor: colors.accent + '20',
+  },
+  categoryChipText: {
+    fontSize: 12,
+    color: colors.gray,
+    fontWeight: '500',
+  },
+  categoryChipTextActive: {
     color: colors.accent,
   },
 });
