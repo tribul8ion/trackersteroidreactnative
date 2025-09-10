@@ -9,7 +9,8 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  Animated
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,8 +22,104 @@ import { signIn, supabase } from '../services/auth';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '../theme/colors';
+import Animated, { 
+  FadeIn, 
+  FadeInDown, 
+  FadeInUp, 
+  SlideInLeft, 
+  SlideInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+  withDelay
+} from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
+
+// Компонент для анимированного логотипа
+const AnimatedLogo = () => {
+  const scale = useSharedValue(0);
+  const rotation = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withSequence(
+      withTiming(1.2, { duration: 600 }),
+      withSpring(1, { damping: 8, stiffness: 100 })
+    );
+    rotation.value = withTiming(360, { duration: 1000 });
+    opacity.value = withTiming(1, { duration: 800 });
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { rotate: `${rotation.value}deg` }
+    ],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.logoContainer, animatedStyle]}>
+      <View style={styles.logoCircle}>
+        <Ionicons name="fitness" size={48} color={colors.accent} />
+      </View>
+    </Animated.View>
+  );
+};
+
+// Компонент для валидации email
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// Компонент для валидации пароля
+const validatePassword = (password: string): { isValid: boolean; message: string } => {
+  if (password.length < 6) {
+    return { isValid: false, message: 'Пароль должен содержать минимум 6 символов' };
+  }
+  return { isValid: true, message: '' };
+};
+
+// Компонент для отображения ошибок валидации
+const ValidationError = ({ message, visible }: { message: string; visible: boolean }) => {
+  if (!visible) return null;
+  
+  return (
+    <Animated.View entering={FadeInDown.duration(300)} style={styles.validationError}>
+      <Ionicons name="alert-circle" size={16} color={colors.error} />
+      <Text style={styles.validationErrorText}>{message}</Text>
+    </Animated.View>
+  );
+};
+
+// Компонент для анимированного индикатора загрузки
+const LoadingIndicator = ({ visible }: { visible: boolean }) => {
+  const rotation = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      rotation.value = withTiming(360, { duration: 1000, repeat: -1 });
+    } else {
+      rotation.value = 0;
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.loadingIndicator, animatedStyle]}>
+      <Ionicons name="refresh" size={20} color={colors.accent} />
+    </Animated.View>
+  );
+};
 
 // Компонент Button в стиле дэшборда
 const Button = ({
@@ -113,6 +210,11 @@ const AuthScreen = () => {
   const [canUseBiometry, setCanUseBiometry] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [modal, setModal] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: '', message: '' });
+  
+  // Состояния для валидации
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [isFormValid, setIsFormValid] = useState(false);
 
   useEffect(() => {
     // Проверка биометрии и сессии
@@ -125,14 +227,27 @@ const AuthScreen = () => {
     })();
   }, []);
 
+  // Валидация формы при изменении полей
+  useEffect(() => {
+    const emailValid = validateEmail(email);
+    const passwordValid = validatePassword(password).isValid;
+    
+    setEmailError(email && !emailValid ? 'Введите корректный email' : '');
+    setPasswordError(password && !passwordValid ? 'Пароль должен содержать минимум 6 символов' : '');
+    
+    setIsFormValid(emailValid && passwordValid && email.length > 0 && password.length > 0);
+  }, [email, password]);
+
   const handleSignIn = async () => {
-    if (!email || !password) {
-      setModal({ visible: true, title: 'Ошибка', message: 'Заполните все поля' });
+    if (!isFormValid) {
+      setModal({ visible: true, title: 'Ошибка', message: 'Проверьте правильность заполнения полей' });
       return;
     }
+    
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
+    
     if (error) {
       setModal({ visible: true, title: 'Ошибка входа', message: error.message || 'Неверный email или пароль' });
     } else {
@@ -186,47 +301,46 @@ const AuthScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="fitness" size={48} color={colors.accent} />
-            </View>
-            <Text style={styles.title}>Steroid Tracker</Text>
-            <Text style={styles.subtitle}>Твой путь к совершенству</Text>
-          </View>
+          <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
+            <AnimatedLogo />
+            <Animated.Text entering={FadeInUp.delay(400)} style={styles.title}>Steroid Tracker</Animated.Text>
+            <Animated.Text entering={FadeInUp.delay(600)} style={styles.subtitle}>Твой путь к совершенству</Animated.Text>
+          </Animated.View>
 
           {/* Main Form Card */}
-          <View style={styles.formSection}>
+          <Animated.View entering={SlideInLeft.delay(800)} style={styles.formSection}>
             <Card style={styles.formCard}>
-              <View style={styles.cardHeader}>
+              <Animated.View entering={FadeIn.delay(1000)} style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>Вход в аккаунт</Text>
                 <Text style={styles.cardSubtitle}>Добро пожаловать обратно</Text>
-              </View>
+              </Animated.View>
 
-              <View style={styles.cardContent}>
+              <Animated.View entering={FadeIn.delay(1200)} style={styles.cardContent}>
                 {/* Email Input */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Email</Text>
                   <TextInput
                     value={email}
                     onChangeText={setEmail}
-                    style={styles.input}
+                    style={[styles.input, emailError ? styles.inputError : null]}
                     autoCapitalize="none"
                     keyboardType="email-address"
                     mode="outlined"
                     placeholder="Введите ваш email"
                     theme={{
                       colors: {
-                        primary: '#D0BCFF',
-                        outline: '#49454F',
+                        primary: emailError ? colors.error : '#D0BCFF',
+                        outline: emailError ? colors.error : '#49454F',
                         background: '#1C1B1F',
                         onSurfaceVariant: '#CAC4D0',
                         onSurface: '#FFF'
                       }
                     }}
-                    outlineStyle={styles.inputOutline}
+                    outlineStyle={[styles.inputOutline, emailError ? styles.inputOutlineError : null]}
                     contentStyle={styles.inputContent}
                     left={<TextInput.Icon icon="email-outline" />}
                   />
+                  <ValidationError message={emailError} visible={!!emailError} />
                 </View>
 
                 {/* Password Input */}
@@ -235,20 +349,20 @@ const AuthScreen = () => {
                   <TextInput
                     value={password}
                     onChangeText={setPassword}
-                    style={styles.input}
+                    style={[styles.input, passwordError ? styles.inputError : null]}
                     secureTextEntry={!showPassword}
                     mode="outlined"
                     placeholder="Введите ваш пароль"
                     theme={{
                       colors: {
-                        primary: '#D0BCFF',
-                        outline: '#49454F',
+                        primary: passwordError ? colors.error : '#D0BCFF',
+                        outline: passwordError ? colors.error : '#49454F',
                         background: '#1C1B1F',
                         onSurfaceVariant: '#CAC4D0',
                         onSurface: '#FFF'
                       }
                     }}
-                    outlineStyle={styles.inputOutline}
+                    outlineStyle={[styles.inputOutline, passwordError ? styles.inputOutlineError : null]}
                     contentStyle={styles.inputContent}
                     left={<TextInput.Icon icon="lock-outline" />}
                     right={
@@ -258,24 +372,36 @@ const AuthScreen = () => {
                       />
                     }
                   />
+                  <ValidationError message={passwordError} visible={!!passwordError} />
                 </View>
 
                 {/* Forgot Password */}
-                <TouchableOpacity style={styles.forgotPassword}>
-                  <Text style={styles.forgotPasswordText}>Забыли пароль?</Text>
-                </TouchableOpacity>
+                <Animated.View entering={FadeIn.delay(1400)}>
+                  <TouchableOpacity style={styles.forgotPassword}>
+                    <Text style={styles.forgotPasswordText}>Забыли пароль?</Text>
+                  </TouchableOpacity>
+                </Animated.View>
 
                 {/* Sign In Button */}
-                <Button
-                  variant="primary"
-                  onPress={handleSignIn}
-                  loading={loading}
-                  disabled={loading}
-                  icon="log-in-outline"
-                  style={styles.signInButton}
-                >
-                  Войти
-                </Button>
+                <Animated.View entering={FadeInUp.delay(1600)}>
+                  <Button
+                    variant="primary"
+                    onPress={handleSignIn}
+                    loading={loading}
+                    disabled={loading || !isFormValid}
+                    icon={loading ? undefined : "log-in-outline"}
+                    style={[styles.signInButton, !isFormValid && styles.buttonDisabled]}
+                  >
+                    {loading ? (
+                      <View style={styles.buttonLoadingContent}>
+                        <LoadingIndicator visible={loading} />
+                        <Text style={styles.buttonText}>Вход...</Text>
+                      </View>
+                    ) : (
+                      'Войти'
+                    )}
+                  </Button>
+                </Animated.View>
 
                 {/* Alternative Methods */}
                 {/*
@@ -304,18 +430,18 @@ const AuthScreen = () => {
           </View>
 
           {/* Sign Up Link */}
-          <View style={styles.footer}>
+          <Animated.View entering={FadeInUp.delay(1800)} style={styles.footer}>
             <Text style={styles.footerText}>Нет аккаунта?</Text>
             <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
               <Text style={styles.signUpText}>Зарегистрироваться</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {/* Security Badge */}
-          <View style={styles.securityBadge}>
+          <Animated.View entering={FadeIn.delay(2000)} style={styles.securityBadge}>
             <Ionicons name="shield-checkmark" size={16} color="#4ADE80" />
             <Text style={styles.securityText}>Ваши данные под надёжной защитой</Text>
-          </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -342,6 +468,23 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.accent + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.accent + '40',
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -406,6 +549,33 @@ const styles = StyleSheet.create({
     borderColor: colors.grayLight,
     borderWidth: 1,
     borderRadius: 12,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  inputOutlineError: {
+    borderColor: colors.error,
+    borderWidth: 2,
+  },
+  validationError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  validationErrorText: {
+    fontSize: 12,
+    color: colors.error,
+    fontWeight: '500',
+  },
+  loadingIndicator: {
+    marginRight: 8,
+  },
+  buttonLoadingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   inputContent: {
     color: colors.white,
