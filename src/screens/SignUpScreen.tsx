@@ -18,6 +18,76 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { signUp } from '../services/auth';
 import { colors } from '../theme/colors';
+import Animated, { 
+  FadeIn, 
+  FadeInDown, 
+  FadeInUp, 
+  SlideInLeft, 
+  SlideInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+  withDelay
+} from 'react-native-reanimated';
+
+// Компонент для анимированного логотипа
+const AnimatedLogo = () => {
+  const scale = useSharedValue(0);
+  const rotation = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withSequence(
+      withTiming(1.2, { duration: 600 }),
+      withSpring(1, { damping: 8, stiffness: 100 })
+    );
+    rotation.value = withTiming(360, { duration: 1000 });
+    opacity.value = withTiming(1, { duration: 800 });
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { rotate: `${rotation.value}deg` }
+    ],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.logoContainer, animatedStyle]}>
+      <View style={styles.logoCircle}>
+        <Ionicons name="person-add" size={48} color={colors.accent} />
+      </View>
+    </Animated.View>
+  );
+};
+
+// Компонент для анимированного индикатора загрузки
+const LoadingIndicator = ({ visible }: { visible: boolean }) => {
+  const rotation = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      rotation.value = withTiming(360, { duration: 1000, repeat: -1 });
+    } else {
+      rotation.value = 0;
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.loadingIndicator, animatedStyle]}>
+      <Ionicons name="refresh" size={20} color={colors.accent} />
+    </Animated.View>
+  );
+};
 
 // Компонент Button в стиле дэшборда
 const Button = ({
@@ -167,23 +237,21 @@ const SignUpScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="person-add" size={48} color={colors.accent} />
-            </View>
-            <Text style={[styles.title, { color: colors.accent }]}>Создать аккаунт</Text>
-            <Text style={styles.subtitle}>Присоединяйтесь к сообществу</Text>
-          </View>
+          <Animated.View entering={FadeInDown.delay(200)} style={styles.header}>
+            <AnimatedLogo />
+            <Animated.Text entering={FadeInUp.delay(400)} style={[styles.title, { color: colors.accent }]}>Создать аккаунт</Animated.Text>
+            <Animated.Text entering={FadeInUp.delay(600)} style={styles.subtitle}>Присоединяйтесь к сообществу</Animated.Text>
+          </Animated.View>
 
           {/* Main Form Card */}
-          <View style={styles.formSection}>
+          <Animated.View entering={SlideInLeft.delay(800)} style={styles.formSection}>
             <Card style={styles.formCard}>
-              <View style={styles.cardHeader}>
+              <Animated.View entering={FadeIn.delay(1000)} style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>Регистрация</Text>
                 <Text style={styles.cardSubtitle}>Заполните данные для создания аккаунта</Text>
-              </View>
+              </Animated.View>
 
-              <View style={styles.cardContent}>
+              <Animated.View entering={FadeIn.delay(1200)} style={styles.cardContent}>
                 {/* Full Name Input */}
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Полное имя</Text>
@@ -352,33 +420,42 @@ const SignUpScreen = () => {
                 </TouchableOpacity>
 
                 {/* Sign Up Button */}
-                <Button
-                  variant="primary"
-                  onPress={handleSignUp}
-                  loading={loading}
-                  disabled={!isFormValid || loading}
-                  icon="person-add-outline"
-                  style={[styles.signUpButton, !isFormValid && styles.buttonDisabled]}
-                >
-                  Создать аккаунт
-                </Button>
+                <Animated.View entering={FadeInUp.delay(1600)}>
+                  <Button
+                    variant="primary"
+                    onPress={handleSignUp}
+                    loading={loading}
+                    disabled={!isFormValid || loading}
+                    icon={loading ? undefined : "person-add-outline"}
+                    style={[styles.signUpButton, !isFormValid && styles.buttonDisabled]}
+                  >
+                    {loading ? (
+                      <View style={styles.buttonLoadingContent}>
+                        <LoadingIndicator visible={loading} />
+                        <Text style={styles.buttonText}>Создание...</Text>
+                      </View>
+                    ) : (
+                      'Создать аккаунт'
+                    )}
+                  </Button>
+                </Animated.View>
               </View>
             </Card>
           </View>
 
           {/* Sign In Link */}
-          <View style={styles.footer}>
+          <Animated.View entering={FadeInUp.delay(1800)} style={styles.footer}>
             <Text style={styles.footerText}>Уже есть аккаунт?</Text>
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <Text style={[styles.signInText, { color: colors.accent }]}>Войти</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {/* Security Badge */}
-          <View style={styles.securityBadge}>
+          <Animated.View entering={FadeIn.delay(2000)} style={styles.securityBadge}>
             <Ionicons name="shield-checkmark" size={16} color="#4ADE80" />
             <Text style={styles.securityText}>256-битное шифрование данных</Text>
-          </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -405,6 +482,23 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.accent + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.accent + '40',
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -571,6 +665,14 @@ const styles = StyleSheet.create({
   },
   buttonTextGhost: {
     color: '#CAC4D0',
+  },
+  loadingIndicator: {
+    marginRight: 8,
+  },
+  buttonLoadingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   signUpButton: {
     marginTop: 8,

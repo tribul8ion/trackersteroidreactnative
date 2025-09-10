@@ -1,194 +1,309 @@
-import { supabase } from './supabase';
-// import { achievementsList, Achievement } from '../data/achievementsList';
+import { LocalStorageService } from './localStorage';
+import { Achievement, UserAchievement } from './types';
+import { achievementsList } from '../data/achievementsList';
 
-export type Achievement = {
-  id: string;
-  name: string;
-  description: string;
-  type: 'serious' | 'meme';
-  icon: string;
-};
-
-export type UserAchievement = {
-  id: string;
-  user_id: string;
-  achievement_id: string;
-  created_at: string;
-};
-
-export async function getAchievements(user_id: string) {
-  return await supabase
-    .from('user_achievements')
-    .select('*, achievement:achievement_id(*)')
-    .eq('user_id', user_id);
-}
-
-export async function getAllAchievements() {
-  return await supabase.from('achievements').select('*');
-}
-
-export async function addUserAchievement(user_id: string, achievement_id: string) {
-  return await supabase.from('user_achievements').insert([{ user_id, achievement_id }]);
-}
-
-// Проверка и выдача достижений, связанных с профилем
-export async function checkAndGrantProfileAchievements(user_id: string, profile: { username?: string; bio?: string }) {
-  // Получаем все достижения пользователя
-  const { data: userAchData } = await getAchievements(user_id);
-  const userAchievementIds = userAchData?.map((ua: any) => ua.achievement_id) || [];
-
-  // Получаем все достижения
-  const { data: allAchData } = await getAllAchievements();
-  if (!allAchData) return;
-
-  // Массив для выдачи
-  const toGrant: string[] = [];
-
-  // Мемный ник
-  const memeNick = allAchData.find((a: any) => a.name === 'Мемный ник');
-  if (memeNick && profile.username && profile.username.toLowerCase() === 'admin' && !userAchievementIds.includes(memeNick.id)) {
-    toGrant.push(memeNick.id);
+export class AchievementsService {
+  // Получение всех достижений
+  static async getAllAchievements(): Promise<Achievement[]> {
+    return achievementsList;
   }
 
-  // Биохакер
-  const biohacker = allAchData.find((a: any) => a.name === 'Биохакер');
-  if (biohacker && profile.bio && profile.bio.length > 100 && !userAchievementIds.includes(biohacker.id)) {
-    toGrant.push(biohacker.id);
+  // Получение достижений пользователя
+  static async getUserAchievements(): Promise<UserAchievement[]> {
+    return await LocalStorageService.getUserAchievements();
   }
 
-  // Первый шаг (регистрация)
-  const firstStep = allAchData.find((a: any) => a.name === 'Первый шаг');
-  if (firstStep && !userAchievementIds.includes(firstStep.id)) {
-    toGrant.push(firstStep.id);
+  // Получение достижений с прогрессом
+  static async getAchievementsWithProgress(): Promise<Array<Achievement & { achieved: boolean; progress: number }>> {
+    const allAchievements = await this.getAllAchievements();
+    const userAchievements = await this.getUserAchievements();
+    const userAchievementIds = userAchievements.map(ua => ua.achievement_id);
+
+    // Получаем статистику пользователя для расчета прогресса
+    const stats = await this.getUserStatistics();
+
+    return allAchievements.map(achievement => {
+      const achieved = userAchievementIds.includes(achievement.id);
+      const progress = this.calculateProgress(achievement, stats);
+      
+      return {
+        ...achievement,
+        achieved,
+        progress,
+      };
+    });
   }
 
-  // Выдаём все подходящие достижения
-  for (const achId of toGrant) {
-    await addUserAchievement(user_id, achId);
-  }
-}
+  // Получение статистики пользователя
+  private static async getUserStatistics(): Promise<{
+    courses: any[];
+    actions: any[];
+    labs: any[];
+    profile: any;
+  }> {
+    const [courses, actions, labs, profile] = await Promise.all([
+      LocalStorageService.getCourses(),
+      LocalStorageService.getActions(),
+      LocalStorageService.getLabs(),
+      LocalStorageService.getProfile(),
+    ]);
 
-export async function checkAndGrantActionAchievements(user_id: string, profile?: any) {
-  const { data: userAchData } = await getAchievements(user_id);
-  const userAchievementIds = userAchData?.map((ua: any) => ua.achievement_id) || [];
-  const { data: allAchData } = await getAllAchievements();
-  if (!allAchData) return [];
-
-  // Получаем курсы, действия, анализы
-  const { data: courses } = await supabase.from('courses').select('*').eq('user_id', user_id);
-  const { data: actions } = await supabase.from('actions').select('*').eq('user_id', user_id);
-  const { data: labs } = await supabase.from('labs').select('*').eq('user_id', user_id);
-
-  const toGrant: string[] = [];
-  const newAchievements: any[] = [];
-
-  // Первый курс
-  const firstCourse = allAchData.find((a: any) => a.name === 'Первый курс');
-  if (firstCourse && courses && courses.length >= 1 && !userAchievementIds.includes(firstCourse.id)) {
-    toGrant.push(firstCourse.id);
-    newAchievements.push(firstCourse);
+    return { courses, actions, labs, profile };
   }
 
-  // 5 курсов
-  const fiveCourses = allAchData.find((a: any) => a.name === 'Опытный курсант');
-  if (fiveCourses && courses && courses.length >= 5 && !userAchievementIds.includes(fiveCourses.id)) {
-    toGrant.push(fiveCourses.id);
-    newAchievements.push(fiveCourses);
+  // Расчет прогресса достижения
+  private static calculateProgress(achievement: Achievement, stats: any): number {
+    const { courses, actions, labs, profile } = stats;
+
+    switch (achievement.id) {
+      case 'first_step':
+        return profile ? 1 : 0;
+
+      case 'perfect_profile':
+        return profile && profile.full_name && profile.username && profile.avatar_url && 
+               profile.date_of_birth && profile.city && profile.bio && profile.gender ? 1 : 0;
+
+      case 'meme_nickname':
+        return profile?.username?.toLowerCase() === 'admin' ? 1 : 0;
+
+      case 'biohacker':
+        return profile?.bio && profile.bio.length > 100 ? 1 : 0;
+
+      case 'first_course':
+        return courses && courses.length >= 1 ? 1 : 0;
+
+      case 'experienced_courseman':
+        return Math.min(courses?.length || 0, 5);
+
+      case 'diverse':
+        if (courses) {
+          const uniqueTypes = new Set(courses.map((c: any) => c.type));
+          return Math.min(uniqueTypes.size, 3);
+        }
+        return 0;
+
+      case 'course_master':
+        return Math.min(courses?.length || 0, 10);
+
+      case 'first_injection':
+        return actions && actions.some((a: any) => a.type === 'injection') ? 1 : 0;
+
+      case 'ten_injections':
+        return Math.min(actions?.filter((a: any) => a.type === 'injection').length || 0, 10);
+
+      case 'injection_master':
+        return Math.min(actions?.filter((a: any) => a.type === 'injection').length || 0, 100);
+
+      case 'tablet_start':
+        return actions && actions.some((a: any) => a.type === 'tablet') ? 1 : 0;
+
+      case 'caring':
+        return labs && labs.length >= 1 ? 1 : 0;
+
+      case 'lab_rat':
+        return Math.min(labs?.length || 0, 10);
+
+      case 'health_monitor':
+        return Math.min(labs?.length || 0, 50);
+
+      case 'week_streak':
+        if (actions && actions.length > 0) {
+          const days = actions.map((a: any) => a.timestamp.slice(0, 10));
+          const uniqueDays = Array.from(new Set(days)).sort();
+          let maxStreak = 1, curStreak = 1;
+          for (let i = 1; i < uniqueDays.length; i++) {
+            const prev = new Date(uniqueDays[i - 1]);
+            const curr = new Date(uniqueDays[i]);
+            if ((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24) === 1) {
+              curStreak++;
+              maxStreak = Math.max(maxStreak, curStreak);
+            } else {
+              curStreak = 1;
+            }
+          }
+          return Math.min(maxStreak, 7);
+        }
+        return 0;
+
+      case 'month_streak':
+        if (actions && actions.length > 0) {
+          const days = actions.map((a: any) => a.timestamp.slice(0, 10));
+          const uniqueDays = Array.from(new Set(days)).sort();
+          let maxStreak = 1, curStreak = 1;
+          for (let i = 1; i < uniqueDays.length; i++) {
+            const prev = new Date(uniqueDays[i - 1]);
+            const curr = new Date(uniqueDays[i]);
+            if ((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24) === 1) {
+              curStreak++;
+              maxStreak = Math.max(maxStreak, curStreak);
+            } else {
+              curStreak = 1;
+            }
+          }
+          return Math.min(maxStreak, 30);
+        }
+        return 0;
+
+      case 'night_owl':
+        return courses && courses.some((c: any) => {
+          const hour = new Date(c.created_at).getHours();
+          return hour >= 2 && hour < 6;
+        }) ? 1 : 0;
+
+      case 'early_bird':
+        return courses && courses.some((c: any) => {
+          const hour = new Date(c.created_at).getHours();
+          return hour >= 5 && hour < 7;
+        }) ? 1 : 0;
+
+      case 'weekend_warrior':
+        return courses && courses.some((c: any) => {
+          const day = new Date(c.created_at).getDay();
+          return day === 0 || day === 6;
+        }) ? 1 : 0;
+
+      case 'data_hoarder':
+        return Math.min(actions?.length || 0, 1000);
+
+      case 'perfectionist':
+        const hasPerfectProfile = profile && profile.full_name && profile.username && 
+                                profile.avatar_url && profile.date_of_birth && 
+                                profile.city && profile.bio && profile.gender;
+        const hasEnoughCourses = courses && courses.length >= 5;
+        return (hasPerfectProfile && hasEnoughCourses) ? 1 : 0;
+
+      default:
+        return 0;
+    }
   }
 
-  // 3 разных типа курсов
-  const diverse = allAchData.find((a: any) => a.name === 'Разносторонний');
-  if (diverse && courses && new Set(courses.map((c: any) => c.type)).size >= 3 && !userAchievementIds.includes(diverse.id)) {
-    toGrant.push(diverse.id);
-    newAchievements.push(diverse);
-  }
+  // Проверка и выдача достижений
+  static async checkAndGrantAchievements(): Promise<Achievement[]> {
+    const achievements = await this.getAchievementsWithProgress();
+    const userAchievements = await this.getUserAchievements();
+    const userAchievementIds = userAchievements.map(ua => ua.achievement_id);
 
-  // 10 инъекций
-  const tenInj = allAchData.find((a: any) => a.name === '10 инъекций');
-  if (
-    tenInj &&
-    actions &&
-    actions.filter((a: any) => a.type === 'injection').length >= 10 &&
-    !userAchievementIds.includes(tenInj.id)
-  ) {
-    toGrant.push(tenInj.id);
-    newAchievements.push(tenInj);
-  }
+    const newAchievements: Achievement[] = [];
 
-  // Таблеточный старт
-  const tabletStart = allAchData.find((a: any) => a.name === 'Таблеточный старт');
-  if (
-    tabletStart &&
-    actions &&
-    actions.some((a: any) => a.type === 'tablet') &&
-    !userAchievementIds.includes(tabletStart.id)
-  ) {
-    toGrant.push(tabletStart.id);
-    newAchievements.push(tabletStart);
-  }
+    for (const achievement of achievements) {
+      if (!achievement.achieved && achievement.progress >= (achievement.required || 1)) {
+        // Выдаем достижение
+        const userAchievement: UserAchievement = {
+          id: this.generateUserAchievementId(),
+          achievement_id: achievement.id,
+          achieved_at: new Date().toISOString(),
+          progress: achievement.progress,
+        };
 
-  // Заботливый (анализ)
-  const caring = allAchData.find((a: any) => a.name === 'Заботливый');
-  if (caring && labs && labs.length > 0 && !userAchievementIds.includes(caring.id)) {
-    toGrant.push(caring.id);
-    newAchievements.push(caring);
-  }
-
-  // Ночной совёнок
-  const nightOwl = allAchData.find((a: any) => a.name === 'Ночной совёнок');
-  if (
-    nightOwl &&
-    courses &&
-    courses.some((c: any) => {
-      const hour = new Date(c.created_at).getHours();
-      return hour >= 2 && hour < 6;
-    }) &&
-    !userAchievementIds.includes(nightOwl.id)
-  ) {
-    toGrant.push(nightOwl.id);
-    newAchievements.push(nightOwl);
-  }
-
-  // streak (7 дней подряд есть действия)
-  const streak = allAchData.find((a: any) => a.name === 'Неделя без пропусков');
-  if (streak && actions && actions.length > 0 && !userAchievementIds.includes(streak.id)) {
-    const days = actions.map((a: any) => a.timestamp.slice(0, 10));
-    const uniqueDays = Array.from(new Set(days)).sort();
-    let maxStreak = 1, curStreak = 1;
-    for (let i = 1; i < uniqueDays.length; i++) {
-      const prev = new Date(uniqueDays[i - 1]);
-      const curr = new Date(uniqueDays[i]);
-      if ((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24) === 1) {
-        curStreak++;
-        maxStreak = Math.max(maxStreak, curStreak);
-      } else {
-        curStreak = 1;
+        await LocalStorageService.addUserAchievement(userAchievement);
+        newAchievements.push(achievement);
       }
     }
-    if (maxStreak >= 7) {
-      toGrant.push(streak.id);
-      newAchievements.push(streak);
-    }
+
+    return newAchievements;
   }
 
-  // Идеальный профиль (все поля заполнены)
-  const perfectProfile = allAchData.find((a: any) => a.name === 'Идеальный профиль');
-  if (
-    perfectProfile &&
-    profile &&
-    profile.full_name && profile.username && profile.avatar_url && profile.date_of_birth && profile.city && profile.bio && profile.gender &&
-    !userAchievementIds.includes(perfectProfile.id)
-  ) {
-    toGrant.push(perfectProfile.id);
-    newAchievements.push(perfectProfile);
+  // Получение достижений по категории
+  static async getAchievementsByCategory(category: Achievement['category']): Promise<Array<Achievement & { achieved: boolean; progress: number }>> {
+    const achievements = await this.getAchievementsWithProgress();
+    return achievements.filter(achievement => achievement.category === category);
   }
 
-  for (const achId of toGrant) {
-    await addUserAchievement(user_id, achId);
+  // Получение статистики достижений
+  static async getAchievementsStatistics(): Promise<{
+    total: number;
+    achieved: number;
+    byCategory: Record<string, { total: number; achieved: number }>;
+    byRarity: Record<string, { total: number; achieved: number }>;
+    totalPoints: number;
+    achievedPoints: number;
+  }> {
+    const achievements = await this.getAchievementsWithProgress();
+
+    const stats = {
+      total: achievements.length,
+      achieved: achievements.filter(a => a.achieved).length,
+      byCategory: {} as Record<string, { total: number; achieved: number }>,
+      byRarity: {} as Record<string, { total: number; achieved: number }>,
+      totalPoints: 0,
+      achievedPoints: 0,
+    };
+
+    achievements.forEach(achievement => {
+      // По категориям
+      if (!stats.byCategory[achievement.category]) {
+        stats.byCategory[achievement.category] = { total: 0, achieved: 0 };
+      }
+      stats.byCategory[achievement.category].total++;
+      if (achievement.achieved) {
+        stats.byCategory[achievement.category].achieved++;
+      }
+
+      // По редкости
+      if (!stats.byRarity[achievement.rarity]) {
+        stats.byRarity[achievement.rarity] = { total: 0, achieved: 0 };
+      }
+      stats.byRarity[achievement.rarity].total++;
+      if (achievement.achieved) {
+        stats.byRarity[achievement.rarity].achieved++;
+      }
+
+      // Очки
+      stats.totalPoints += achievement.points;
+      if (achievement.achieved) {
+        stats.achievedPoints += achievement.points;
+      }
+    });
+
+    return stats;
   }
-  return newAchievements;
+
+  // Получение последних достижений
+  static async getRecentAchievements(limit: number = 5): Promise<UserAchievement[]> {
+    const userAchievements = await this.getUserAchievements();
+    return userAchievements
+      .sort((a, b) => new Date(b.achieved_at).getTime() - new Date(a.achieved_at).getTime())
+      .slice(0, limit);
+  }
+
+  // Поиск достижений
+  static async searchAchievements(query: string): Promise<Array<Achievement & { achieved: boolean; progress: number }>> {
+    const achievements = await this.getAchievementsWithProgress();
+    const lowercaseQuery = query.toLowerCase();
+    
+    return achievements.filter(achievement => 
+      achievement.name.toLowerCase().includes(lowercaseQuery) ||
+      achievement.description.toLowerCase().includes(lowercaseQuery) ||
+      achievement.category.toLowerCase().includes(lowercaseQuery)
+    );
+  }
+
+  // Получение достижения по ID
+  static async getAchievementById(id: string): Promise<(Achievement & { achieved: boolean; progress: number }) | null> {
+    const achievements = await this.getAchievementsWithProgress();
+    return achievements.find(achievement => achievement.id === id) || null;
+  }
+
+  // Получение достижений по редкости
+  static async getAchievementsByRarity(rarity: Achievement['rarity']): Promise<Array<Achievement & { achieved: boolean; progress: number }>> {
+    const achievements = await this.getAchievementsWithProgress();
+    return achievements.filter(achievement => achievement.rarity === rarity);
+  }
+
+  // Получение секретных достижений
+  static async getSecretAchievements(): Promise<Array<Achievement & { achieved: boolean; progress: number }>> {
+    const achievements = await this.getAchievementsWithProgress();
+    return achievements.filter(achievement => achievement.isSecret);
+  }
+
+  // Получение мемных достижений
+  static async getMemeAchievements(): Promise<Array<Achievement & { achieved: boolean; progress: number }>> {
+    const achievements = await this.getAchievementsWithProgress();
+    return achievements.filter(achievement => achievement.meme);
+  }
+
+  // Генерация ID пользовательского достижения
+  private static generateUserAchievementId(): string {
+    return 'user_achievement_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
 }
-
-export async function getUserAchievementsProgress(user_id: string) {
-  return [];
-} 

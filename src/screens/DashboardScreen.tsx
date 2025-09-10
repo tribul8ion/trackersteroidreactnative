@@ -30,12 +30,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { getUser } from '../services/auth';
-import { getCourses } from '../services/courses';
-import { getLabs } from '../services/labs';
-import { getActions } from '../services/actions';
-import { getProfile } from '../services/profile';
-import { getReminders, Reminder } from '../services/reminders';
+import { AuthService } from '../services/auth';
+import { CoursesService } from '../services/courses';
+import { LabsService } from '../services/labs';
+import { ActionsService } from '../services/actions';
+import { AchievementsService } from '../services/achievements';
+import { AnalyticsService } from '../services/analytics';
 import { LineChart } from 'react-native-gifted-charts';
 import { colors } from '../theme/colors';
 import { Portal, Dialog, Button } from 'react-native-paper';
@@ -1979,36 +1979,46 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: userData } = await getUser();
-      const user_id = userData?.user?.id;
-      if (!user_id) return;
-      
-      // Загружаем данные
-      const { data: profileData } = await getProfile(user_id);
-      setProfile(profileData);
-      
-      const { data: coursesData } = await getCourses(user_id);
-      setCourses(coursesData || []);
-      const active = (coursesData || []).find((c: any) => 
-        (c.status || '').toLowerCase().replace(/\s/g, '') === 'активный'
-      );
-      const selectedCourse = active || (coursesData && coursesData[0]) || null;
-      setCurrentCourse(selectedCourse);
-      
-      const { data: labsData } = await getLabs(user_id);
-      setLabs(labsData || []);
-      
-      const { data: remindersData } = await getReminders(user_id);
-      setReminders(remindersData?.filter((r: Reminder) => !r.is_done) || []);
-      
-      // Загружаем действия для всех курсов
-      if (selectedCourse) {
-        const { data: actionsData } = await getActions(user_id, selectedCourse.id);
-        setActions(actionsData || []);
-        
+      try {
+        // Отслеживаем загрузку дашборда
+        await AnalyticsService.trackScreen('dashboard');
+
+        // Загружаем данные из локального хранилища
+        const [coursesData, labsData, actionsData, profileData, achievementsData] = await Promise.all([
+          CoursesService.getCourses(),
+          LabsService.getLabs(),
+          ActionsService.getActions(),
+          AuthService.getCurrentUser(),
+          AchievementsService.getAchievementsWithProgress(),
+        ]);
+
+        setProfile(profileData);
+        setCourses(coursesData);
+        setLabs(labsData);
+        setActions(actionsData);
+        setAchievements(achievementsData);
+
+        // Находим активный курс
+        const active = coursesData.find((c: any) => 
+          (c.status || '').toLowerCase().replace(/\s/g, '') === 'активный'
+        );
+        const selectedCourse = active || coursesData[0] || null;
+        setCurrentCourse(selectedCourse);
+
+        // Фильтруем напоминания (пока используем пустой массив, так как у нас нет сервиса напоминаний)
+        setReminders([]);
+
+        // Проверяем новые достижения
+        const newAchievements = await AchievementsService.checkAndGrantAchievements();
+        if (newAchievements.length > 0) {
+          setShowAchievementModal(true);
+          setNewAchievements(newAchievements);
+        }
+
         // Статистика курса
-        const todayStr = new Date().toISOString().slice(0, 10);
-        let injectionsDone = 0, tabletsDone = 0;
+        if (selectedCourse) {
+          const todayStr = new Date().toISOString().slice(0, 10);
+          let injectionsDone = 0, tabletsDone = 0;
         (actionsData || []).forEach((a: any) => {
           if (a.timestamp.slice(0, 10) === todayStr) {
             if (a.type === 'injection') {
@@ -2047,6 +2057,10 @@ export default function Dashboard() {
       } else {
         setActions([]);
         setCourseStats({ injectionsDone: 0, injectionsPlanned: 0, tabletsDone: 0, tabletsPlanned: 0 });
+      }
+      } catch (error) {
+        console.error('Ошибка загрузки данных дашборда:', error);
+        await AnalyticsService.trackError('dashboard_load_error', { error: error.message });
       }
     };
     
