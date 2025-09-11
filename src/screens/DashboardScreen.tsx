@@ -39,6 +39,7 @@ import { AnalyticsService } from '../services/analytics';
 import { LineChart } from 'react-native-gifted-charts';
 import { colors } from '../theme/colors';
 import { Portal, Dialog, Button } from 'react-native-paper';
+import { isInjectionForm, isTabletForm } from '../services/domain';
 
 const { width, height } = Dimensions.get('window');
 
@@ -2048,8 +2049,8 @@ export default function Dashboard() {
             const sched = schedule[comp.key];
             if (!sched || !sched.days || !sched.timesPerDay) return;
             if (sched.days.includes(todayKey)) {
-              if (comp.form === 'Инъекция') injectionsPlanned += Number(sched.timesPerDay);
-              if (comp.form && comp.form.includes('Таблет')) tabletsPlanned += Number(sched.timesPerDay);
+              if (isInjectionForm(comp.form)) injectionsPlanned += Number(sched.timesPerDay);
+              if (isTabletForm(comp.form)) tabletsPlanned += Number(sched.timesPerDay);
             }
           });
         } catch {}
@@ -2119,9 +2120,9 @@ export default function Dashboard() {
               if (sched.days.includes(dayKey)) {
                 events.push({
                   date: date.toISOString().slice(0, 10),
-                  type: comp.form === 'Инъекция' ? 'injection' : 'tablet',
+                  type: isInjectionForm(comp.form) ? 'injection' : 'tablet',
                   title: comp.label,
-                  color: comp.form === 'Инъекция' ? colors.accent : colors.blue
+                  color: isInjectionForm(comp.form) ? colors.accent : colors.blue
                 });
               }
             }
@@ -2294,7 +2295,7 @@ export default function Dashboard() {
                   const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
                   hasPlanned = compounds.some((comp: any) => {
                     const sched = schedule[comp.key];
-                    return comp.form === 'Инъекция' && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
+                    return (comp.form && (comp.form.includes('Инъек') || comp.form === 'Injection')) && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
                   });
                 } catch {}
                 if (hasPlanned) {
@@ -2333,7 +2334,7 @@ export default function Dashboard() {
                   const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()];
                   hasPlanned = compounds.some((comp: any) => {
                     const sched = schedule[comp.key];
-                    return comp.form && comp.form.includes('Таблет') && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
+                    return comp.form && (comp.form.includes('Таблет') || comp.form === 'Tablet') && sched && sched.days && sched.timesPerDay && sched.days.includes(todayKey);
                   });
                 } catch {}
                 if (hasPlanned) {

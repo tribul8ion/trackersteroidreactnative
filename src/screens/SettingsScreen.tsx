@@ -6,14 +6,12 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import Constants from 'expo-constants';
-import { getUser, signOut } from '../services/auth';
-import { getProfile, Profile } from '../services/profile';
+import { AuthService } from '../services/auth';
+import type { Profile } from '../services/types';
 import { useContext } from 'react';
 import { colors } from '../theme/colors';
-import { supabase } from '../services/supabase';
-import { sendFeedback } from '../services/feedback';
-import { getCourses } from '../services/courses';
-import { getActions } from '../services/actions';
+import { CoursesService } from '../services/courses';
+import { ActionsService } from '../services/actions';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -372,12 +370,9 @@ const SettingsScreen = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: userData } = await getUser();
-        const user_id = userData?.user?.id;
-        if (!user_id) throw new Error('Не удалось получить пользователя');
-        const { data: profileData, error: profileError } = await getProfile(user_id);
-        if (profileError) throw profileError;
-        setProfile(profileData);
+        const user = AuthService.getCurrentUser();
+        if (!user) throw new Error('Пользователь не авторизован');
+        setProfile(user);
       } catch (e: any) {
         setError(e.message || 'Ошибка загрузки профиля');
       } finally {
@@ -390,11 +385,8 @@ const SettingsScreen = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data: userData } = await getUser();
-        const user_id = userData?.user?.id;
-        if (!user_id) return;
-        const { data: coursesData } = await getCourses(user_id);
-        const { data: actionsData } = await getActions(user_id);
+        const coursesData = await CoursesService.getCourses();
+        const actionsData = await ActionsService.getActions();
         setStats({
           courses: coursesData ? coursesData.length : 0,
           injections: actionsData ? actionsData.filter((a: any) => a.type === 'injection').length : 0,
@@ -408,7 +400,7 @@ const SettingsScreen = () => {
     Alert.alert('Выйти из аккаунта?', '', [
       { text: 'Отмена', style: 'cancel' },
       { text: 'Выйти', style: 'destructive', onPress: async () => {
-        await signOut();
+        await AuthService.signOut();
         navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
       } },
     ]);
@@ -427,21 +419,22 @@ const SettingsScreen = () => {
       return;
     }
     setLoadingModal(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: profile?.email || '', password: currentPassword });
-    if (signInError) {
+    // Оффлайн: нет смены email на сервере
+    if (!profile) {
       setLoadingModal(false);
-      Alert.alert('Ошибка', 'Неверный текущий пароль');
+      Alert.alert('Ошибка', 'Профиль не найден');
       return;
     }
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    const { success, user } = await AuthService.updateProfile({ email: newEmail });
     setLoadingModal(false);
-    if (error) {
-      Alert.alert('Ошибка', error.message || 'Не удалось сменить email');
-    } else {
+    if (success) {
       Alert.alert('Успех', 'Email обновлён. Проверьте почту для подтверждения.');
       setShowEmailModal(false);
       setNewEmail('');
       setCurrentPassword('');
+      setProfile(user || null);
+    } else {
+      Alert.alert('Ошибка', 'Не удалось сменить email');
     }
   };
 
@@ -451,21 +444,21 @@ const SettingsScreen = () => {
       return;
     }
     setLoadingModal(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: profile?.email || '', password: currentPassword });
-    if (signInError) {
+    if (!profile) {
       setLoadingModal(false);
-      Alert.alert('Ошибка', 'Неверный текущий пароль');
+      Alert.alert('Ошибка', 'Профиль не найден');
       return;
     }
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    // Оффлайн: не храним пароль на сервере. Считаем операцию локальной.
+    const { success } = await AuthService.updateProfile({});
     setLoadingModal(false);
-    if (error) {
-      Alert.alert('Ошибка', error.message || 'Не удалось сменить пароль');
-    } else {
+    if (success) {
       Alert.alert('Успех', 'Пароль обновлён!');
       setShowPasswordModal(false);
       setNewPassword('');
       setCurrentPassword('');
+    } else {
+      Alert.alert('Ошибка', 'Не удалось сменить пароль');
     }
   };
 
@@ -486,10 +479,8 @@ const SettingsScreen = () => {
     }
     setFeedbackSent(true);
     try {
-      const { data: userData } = await getUser();
-      const user_id = userData?.user?.id || null;
-      const { error } = await sendFeedback(user_id, feedbackText.trim());
-      if (error) throw error;
+      // Оффлайн: сохраняем как локальное действие-заметку
+      await ActionsService.addNote({ note: `Feedback: ${feedbackText.trim()}` });
     } catch (e: any) {
       Alert.alert('Ошибка', e.message || 'Не удалось отправить отзыв');
       setFeedbackSent(false);

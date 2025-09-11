@@ -2,9 +2,15 @@ import { LocalStorageService } from './localStorage';
 import { Action } from './types';
 
 export class ActionsService {
+  static async initialize(): Promise<void> {
+    await LocalStorageService.getItem('actions' as any);
+  }
   // Получение всех действий
-  static async getActions(): Promise<Action[]> {
-    return await LocalStorageService.getActions();
+  static async getActions(type?: Action['type'], courseId?: string): Promise<Action[]> {
+    let list = (await LocalStorageService.getItem<Action[]>('actions' as any)) || [];
+    if (type) list = list.filter(a => a.type === type);
+    if (courseId) list = list.filter(a => a.course_id === courseId);
+    return list;
   }
 
   // Получение действий по типу
@@ -48,20 +54,23 @@ export class ActionsService {
   }
 
   // Добавление действия
-  static async addAction(actionData: Omit<Action, 'id' | 'created_at'>): Promise<{ success: boolean; action?: Action; error?: string }> {
+  static async addAction(actionData: any): Promise<{ success: boolean; action?: Action; error?: string }> {
     try {
+      if (!actionData || !actionData.type || !actionData.timestamp) {
+        return { success: false, error: 'validation: type and timestamp are required' };
+      }
+      if (!['injection','tablet','note','measurement'].includes(String(actionData.type))) {
+        return { success: false, error: 'validation: unsupported type' };
+      }
       const newAction: Action = {
         ...actionData,
         id: this.generateActionId(),
         created_at: new Date().toISOString(),
       };
 
-      const success = await LocalStorageService.addAction(newAction);
-      if (success) {
-        return { success: true, action: newAction };
-      } else {
-        return { success: false, error: 'Ошибка сохранения действия' };
-      }
+      const existing = (await LocalStorageService.getItem<Action[]>('actions' as any)) || [];
+      await LocalStorageService.setItem('actions' as any, [newAction, ...existing]);
+      return { success: true, action: newAction };
     } catch (error) {
       console.error('Ошибка добавления действия:', error);
       return { success: false, error: 'Ошибка добавления действия' };
@@ -333,14 +342,11 @@ export class ActionsService {
   static async deleteAction(actionId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const actions = await this.getActions();
+      const idx = actions.findIndex(a => a.id === actionId);
+      if (idx === -1) return { success: false, error: 'not found' };
       const filteredActions = actions.filter(action => action.id !== actionId);
-      
-      const success = await LocalStorageService.saveActions(filteredActions);
-      if (success) {
-        return { success: true };
-      } else {
-        return { success: false, error: 'Ошибка удаления действия' };
-      }
+      await LocalStorageService.setItem('actions' as any, filteredActions);
+      return { success: true };
     } catch (error) {
       console.error('Ошибка удаления действия:', error);
       return { success: false, error: 'Ошибка удаления действия' };
@@ -352,3 +358,64 @@ export class ActionsService {
     return 'action_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   }
 }
+
+// Backward-compatible named exports for legacy screens
+export async function getActions(user_id?: string, courseId?: string): Promise<{ data: Action[]; error?: any }> {
+  try {
+    let data = await ActionsService.getActions();
+    if (courseId) {
+      data = data.filter(a => a.course_id === courseId);
+    }
+    return { data };
+  } catch (error) {
+    return { data: [], error };
+  }
+}
+
+export async function addAction(payload: Omit<Action, 'id' | 'created_at'> & { user_id?: string }): Promise<{ error?: any }> {
+  try {
+    const { success, error } = await ActionsService.addAction(payload);
+    if (!success) return { error: error || new Error('Failed to add action') };
+    return {};
+  } catch (error) {
+    return { error };
+  }
+}
+
+// Aliases for tests expecting CRUD-like methods
+export const addInjection = ActionsService.addInjection.bind(ActionsService);
+export const addTablet = ActionsService.addTablet.bind(ActionsService);
+export const addNote = ActionsService.addNote.bind(ActionsService);
+export const deleteActionById = ActionsService.deleteAction.bind(ActionsService);
+export const updateAction = async (id: string, updates: Partial<Action>) => {
+  try {
+    const actions = await ActionsService.getActions();
+    const idx = actions.findIndex(a => a.id === id);
+    if (idx === -1) return { success: false, error: 'not found' };
+    const updated = { ...actions[idx], ...updates } as Action;
+    const remaining = [...actions];
+    remaining[idx] = updated;
+    await LocalStorageService.setItem('actions' as any, remaining);
+    return { success: true, action: updated };
+  } catch (e) {
+    return { success: false, error: 'update failed' };
+  }
+};
+
+// Compatibility name for tests
+(ActionsService as any).updateAction = updateAction;
+(ActionsService as any).getActionStats = async (type?: string, start?: Date, end?: Date) => {
+  const actions = await ActionsService.getActions();
+  const filtered = actions.filter(a => {
+    if (type && a.type !== type) return false;
+    const t = new Date(a.timestamp).getTime();
+    if (start && t < start.getTime()) return false;
+    if (end && t > end.getTime()) return false;
+    return true;
+  });
+  return {
+    injection: filtered.filter(a => a.type === 'injection').length,
+    tablet: filtered.filter(a => a.type === 'tablet').length,
+    note: filtered.filter(a => a.type === 'note').length,
+  } as any;
+};

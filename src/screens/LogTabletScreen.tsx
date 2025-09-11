@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getCourseById } from '../services/courses';
+import { isTabletForm } from '../services/domain';
 import { addAction, getActions } from '../services/actions';
 import { getUser } from '../services/auth';
 import { Portal, Dialog, Button } from 'react-native-paper';
@@ -133,7 +134,7 @@ const LogTabletScreen = () => {
         setCourseName(course.name || 'Курс');
         
         const compounds = JSON.parse(course.compounds || '[]')
-          .filter((c: any) => c.form && c.form.includes('Таблет'));
+          .filter((c: any) => isTabletForm(c.form));
         setCompounds(compounds);
         const scheduleObj = JSON.parse(course.schedule || '{}');
         setSchedule(scheduleObj);

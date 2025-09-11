@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PaperProvider } from 'react-native-paper';
+import { Provider as PaperProvider } from 'react-native-paper';
 import { View, Text, ActivityIndicator } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 import { colors } from './src/theme/colors';
@@ -9,7 +9,7 @@ import { LocalStorageService } from './src/services/localStorage';
 import { AuthService } from './src/services/auth';
 import { AnalyticsService } from './src/services/analytics';
 
-export default function App() {
+export function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFirstLaunch, setIsFirstLaunch] = useState(false);
 
@@ -75,3 +75,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+export default App;
+export { App };

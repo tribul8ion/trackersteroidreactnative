@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testMatch: [
     '**/__tests__/**/*.test.(ts|tsx|js)',
     '**/*.(test|spec).(ts|tsx|js)'
@@ -33,7 +34,7 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(jest-)?react-native|@react-native|@react-navigation|@expo|expo|@unimodules|unimodules|sentry-expo|native-base|react-native-svg|react-native-gifted-charts|react-native-reanimated|react-native-vector-icons|react-native-paper|react-native-safe-area-context|react-native-screens|react-native-gesture-handler)'
   ],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   testTimeout: 10000,

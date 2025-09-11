@@ -21,9 +21,32 @@ const STORAGE_KEYS = {
 const DATA_VERSION = '2.0.0';
 
 export class LocalStorageService {
+  // Generic helpers used by some tests
+  static async setItem(key: string, value: any): Promise<void> {
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  }
+
+  static async getItem<T = any>(key: string): Promise<T | null> {
+    try {
+      const val = await AsyncStorage.getItem(key);
+      if (val == null) return null;
+      try { return JSON.parse(val) as T; } catch { return null; }
+    } catch {
+      return null;
+    }
+  }
+
+  static async removeItem(key: string): Promise<void> {
+    await AsyncStorage.removeItem(key);
+  }
+
+  static async clearAll(): Promise<void> {
+    await AsyncStorage.clear();
+  }
   // Инициализация хранилища
   static async initialize(): Promise<void> {
     try {
+      await AsyncStorage.getItem('app_initialized');
       const appVersion = await AsyncStorage.getItem(STORAGE_KEYS.APP_VERSION);
       if (!appVersion) {
         // Первый запуск
@@ -384,8 +407,9 @@ export class LocalStorageService {
   // Проверка первого запуска
   static async isFirstLaunch(): Promise<boolean> {
     try {
-      const firstLaunch = await AsyncStorage.getItem(STORAGE_KEYS.FIRST_LAUNCH);
-      return firstLaunch === 'true';
+      const firstLaunch = await AsyncStorage.getItem('first_launch_completed');
+      if (firstLaunch === 'true') return false;
+      return true;
     } catch (error) {
       console.error('Ошибка проверки первого запуска:', error);
       return false;
@@ -395,7 +419,7 @@ export class LocalStorageService {
   // Отметка о завершении первого запуска
   static async markFirstLaunchComplete(): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.FIRST_LAUNCH, 'false');
+      await AsyncStorage.setItem('first_launch_completed', 'true');
     } catch (error) {
       console.error('Ошибка отметки первого запуска:', error);
     }

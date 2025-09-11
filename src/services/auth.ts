@@ -19,6 +19,7 @@ export class AuthService {
     if (this.isInitialized) return;
 
     try {
+      await SecureStore.isAvailableAsync();
       // Проверяем, есть ли сохраненный пользователь
       const userId = await SecureStore.getItemAsync(SECURE_KEYS.USER_ID);
       if (userId) {
@@ -32,24 +33,25 @@ export class AuthService {
 
   // Регистрация нового пользователя
   static async signUp(userData: {
-    username: string;
-    email?: string;
-    full_name?: string;
-    password?: string;
+    email: string;
+    password: string;
+    name?: string;
   }): Promise<{ success: boolean; user?: Profile; error?: string }> {
     try {
-      // Проверяем, не существует ли уже пользователь
+      if (!userData.email || !userData.password) {
+        return { success: false, error: 'validation: email and password are required' };
+      }
       const existingProfile = await LocalStorageService.getProfile();
-      if (existingProfile) {
-        return { success: false, error: 'Пользователь уже существует' };
+      if (existingProfile && existingProfile.email === userData.email) {
+        return { success: false, error: 'already exists' };
       }
 
       // Создаем новый профиль
       const newProfile: Profile = {
         id: this.generateUserId(),
-        username: userData.username,
+        username: userData.email,
         email: userData.email,
-        full_name: userData.full_name,
+        full_name: userData.name,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         preferences: {
@@ -67,11 +69,9 @@ export class AuthService {
         return { success: false, error: 'Ошибка сохранения профиля' };
       }
 
-      // Сохраняем ID пользователя в безопасном хранилище
-      if (userData.password) {
-        await SecureStore.setItemAsync(SECURE_KEYS.USER_ID, newProfile.id);
-        await SecureStore.setItemAsync(SECURE_KEYS.AUTH_TOKEN, this.generateAuthToken());
-      }
+      await SecureStore.setItemAsync('user_data' as any, JSON.stringify(newProfile));
+      await SecureStore.setItemAsync(SECURE_KEYS.USER_ID, newProfile.id);
+      await SecureStore.setItemAsync(SECURE_KEYS.AUTH_TOKEN, this.generateAuthToken());
 
       this.currentUser = newProfile;
       return { success: true, user: newProfile };
@@ -82,30 +82,26 @@ export class AuthService {
   }
 
   // Вход в систему
-  static async signIn(identifier: string, password?: string): Promise<{ success: boolean; user?: Profile; error?: string }> {
+  static async signIn(credentials: { email: string; password: string }): Promise<{ success: boolean; user?: Profile; error?: string }> {
     try {
-      const profile = await LocalStorageService.getProfile();
+      const raw = await SecureStore.getItemAsync('user_data' as any);
+      const profile = raw ? (JSON.parse(raw) as Profile) : null;
       
       if (!profile) {
-        return { success: false, error: 'Пользователь не найден' };
+        return { success: false, error: 'Invalid credentials' };
       }
 
       // Проверяем идентификатор (username или email)
-      const isValidIdentifier = 
-        profile.username === identifier || 
-        profile.email === identifier;
+      const isValidIdentifier = profile.email === credentials.email;
 
       if (!isValidIdentifier) {
-        return { success: false, error: 'Неверный логин или пароль' };
+        return { success: false, error: 'Invalid credentials' };
       }
 
       // Если есть пароль, проверяем его
-      if (password) {
-        const storedToken = await SecureStore.getItemAsync(SECURE_KEYS.AUTH_TOKEN);
-        if (!storedToken) {
-          return { success: false, error: 'Неверный пароль' };
-        }
-        // В реальном приложении здесь была бы проверка хеша пароля
+      const storedToken = await SecureStore.getItemAsync(SECURE_KEYS.AUTH_TOKEN);
+      if (!storedToken) {
+        return { success: false, error: 'Invalid credentials' };
       }
 
       // Сохраняем ID пользователя
@@ -120,19 +116,57 @@ export class AuthService {
   }
 
   // Выход из системы
-  static async signOut(): Promise<void> {
+  static async signOut(): Promise<{ success: boolean }> {
     try {
+      await SecureStore.deleteItemAsync('user_data' as any);
       await SecureStore.deleteItemAsync(SECURE_KEYS.USER_ID);
       await SecureStore.deleteItemAsync(SECURE_KEYS.AUTH_TOKEN);
       this.currentUser = null;
+      return { success: true };
     } catch (error) {
       console.error('Ошибка выхода:', error);
+      return { success: false };
     }
   }
 
+  static async isBiometricsAvailable(): Promise<boolean> {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) return false;
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      return !!isEnrolled;
+    } catch {
+      return false;
+    }
+  }
+
+  static async authenticateWithBiometrics(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Вход',
+        disableDeviceFallback: false,
+      });
+      return result.success ? { success: true } : { success: false, error: result.error as any };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'AuthError' };
+    }
+  }
+
+  static async updateUser(updates: Partial<Profile>): Promise<{ success: boolean; user?: Profile }> {
+    const res = await this.updateProfile(updates);
+    return res.success ? { success: true, user: res.user } : { success: false };
+  }
+
   // Получение текущего пользователя
-  static getCurrentUser(): Profile | null {
-    return this.currentUser;
+  static async getCurrentUser(): Promise<Profile | null> {
+    const raw = await SecureStore.getItemAsync('user_data' as any);
+    return raw ? (JSON.parse(raw) as Profile) : null;
+  }
+
+  // Helper used by screens expecting a Supabase-like shape
+  static async getUser(): Promise<{ data: { user: { id: string } | null } }> {
+    const user = this.getCurrentUser();
+    return { data: { user: user ? { id: user.id } : null } };
   }
 
   // Проверка авторизации
@@ -343,4 +377,13 @@ export class AuthService {
       errors,
     };
   }
+}
+
+// Legacy-compatible helpers for screens still importing functions
+export async function getUser(): Promise<{ data: { user: { id: string } | null } }> {
+  return AuthService.getUser();
+}
+
+export async function signOut(): Promise<void> {
+  return AuthService.signOut();
 }

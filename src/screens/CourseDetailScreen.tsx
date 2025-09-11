@@ -31,6 +31,7 @@ import { getCourseById, deleteCourse, updateCourse } from '../services/courses';
 import { getUser } from '../services/auth';
 import { addAction, getActions } from '../services/actions';
 import { getLabs } from '../services/labs';
+import { isInjectionForm } from '../services/domain';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { Portal, Dialog, Button, Menu } from 'react-native-paper';
@@ -312,7 +313,7 @@ const CalendarView = ({ schedule, compounds }: { schedule: any; compounds: any[]
         time: sched.time || '09:00',
         compound: compound.label || compound.key,
         type: compound.form,
-        color: compound.form === 'Инъекция' ? colors.accent : colors.blue
+        color: isInjectionForm(compound.form) ? colors.accent : colors.blue
       });
     });
     

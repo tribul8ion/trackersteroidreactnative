@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { getCourseById } from '../services/courses';
+import { isInjectionForm } from '../services/domain';
 import { addAction, getActions } from '../services/actions';
 import { getUser } from '../services/auth';
 import { checkAndGrantActionAchievements } from '../services/achievements';
@@ -137,7 +138,7 @@ const LogInjectionScreen = () => {
       const { data: course } = await getCourseById(courseIdStr);
       if (course) {
         setCourseName(course.name || 'Курс');
-        const allCompounds = JSON.parse(course.compounds || '[]').filter((c: any) => c.form && c.form.includes('Инъекция'));
+        const allCompounds = JSON.parse(course.compounds || '[]').filter((c: any) => isInjectionForm(c.form));
         const scheduleObj = JSON.parse(course.schedule || '{}');
         setSchedule(scheduleObj);
         let compounds: any[] = [];

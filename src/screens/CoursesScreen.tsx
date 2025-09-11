@@ -27,6 +27,7 @@ import Animated, {
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { getCourses, updateCourse } from '../services/courses';
+import { isInjectionForm } from '../services/domain';
 import { getUser } from '../services/auth';
 import { Menu, Portal, Dialog, Button } from 'react-native-paper';
 import { FontAwesome5 } from '@expo/vector-icons';

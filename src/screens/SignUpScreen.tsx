@@ -439,9 +439,9 @@ const SignUpScreen = () => {
                     )}
                   </Button>
                 </Animated.View>
-              </View>
+              </Animated.View>
             </Card>
-          </View>
+          </Animated.View>
 
           {/* Sign In Link */}
           <Animated.View entering={FadeInUp.delay(1800)} style={styles.footer}>

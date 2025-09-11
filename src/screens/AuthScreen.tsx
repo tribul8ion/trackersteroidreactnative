@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   View, 
   StyleSheet, 
   Text, 
@@ -10,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated
+  Animated as RNAnimated
 } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { signIn, supabase } from '../services/auth';
+import { AuthService } from '../services/auth';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from '../theme/colors';
@@ -245,7 +245,7 @@ const AuthScreen = () => {
     }
     
     setLoading(true);
-    const { error } = await signIn(email, password);
+    const { error } = await AuthService.signIn(email, password);
     setLoading(false);
     
     if (error) {
@@ -273,17 +273,11 @@ const AuthScreen = () => {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-    setLoading(false);
-    
-    if (error) {
-      Alert.alert('Ошибка', error.message || 'Ошибка входа через Google');
-    }
+    Alert.alert('Вход через Google', 'Оффлайн-режим: вход через OAuth недоступен.');
   };
 
   const handleTelegramSignIn = () => {
-    Alert.alert('Telegram', 'Интеграция с Telegram будет реализована позже.');
+    Alert.alert('Telegram', 'Оффлайн-режим: интеграция будет доступна позже.');
   };
 
   return (
@@ -425,9 +419,9 @@ const AuthScreen = () => {
                     </View>
                   </>
                 */}
-              </View>
+              </Animated.View>
             </Card>
-          </View>
+          </Animated.View>
 
           {/* Sign Up Link */}
           <Animated.View entering={FadeInUp.delay(1800)} style={styles.footer}>
